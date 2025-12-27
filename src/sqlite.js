@@ -12,7 +12,7 @@ const isEmpty = (params) => {
 
 class SQLiteDatabase extends Database {
   constructor(path, options = {}) {
-    super();
+    super(options);
     this.dbPath = path;
     this.sqlite3 = sqlite3;
     this.extensions = options.extensions;

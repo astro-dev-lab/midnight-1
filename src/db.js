@@ -22,6 +22,7 @@ class Database {
     this.mappers = {};
     this.customTypes = {};
     this.columns = {};
+    this.columnInfo = {};
     this.hasJson = {};
     this.computed = {};
     this.schema = [];
@@ -121,11 +122,19 @@ class Database {
       }
       this.tables[table.name] = table.columns;
       this.columns[table.name] = {};
+      this.columnInfo[table.name] = {};
       this.computed[table.name] = {};
       this.hasJson[table.name] = false;
       const columns = [...table.columns, ...table.computed];
       for (const column of columns) {
         this.columns[table.name][column.name] = column.type;
+        this.columnInfo[table.name][column.name] = {
+          type: column.type,
+          notNull: column.notNull === true,
+          default: column.default,
+          primaryKey: column.primaryKey === true,
+          computed: Boolean(column.sql)
+        };
         if (column.type === 'json') {
           this.hasJson[table.name] = true;
         }

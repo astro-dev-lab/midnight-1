@@ -126,6 +126,113 @@ const adjust = (db, table, params) => {
   return processed;
 }
 
+const isPlainObject = (value) => Object.getPrototypeOf(value) === Object.prototype;
+
+const validateValueType = (db, table, column, value, meta) => {
+  if (value === undefined) {
+    return;
+  }
+  if (value === null) {
+    if (meta.notNull) {
+      throw Error(`Column ${table}.${column} cannot be null`);
+    }
+    return;
+  }
+  const customType = db.customTypes[meta.type];
+  if (customType && customType.valueTest && !customType.valueTest(value)) {
+    throw Error(`Invalid value for ${table}.${column}`);
+  }
+  if (meta.type === 'integer') {
+    if (!Number.isInteger(value)) {
+      throw Error(`Column ${table}.${column} must be an integer`);
+    }
+  }
+  else if (meta.type === 'real') {
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+      throw Error(`Column ${table}.${column} must be a number`);
+    }
+  }
+  else if (meta.type === 'text') {
+    if (typeof value !== 'string') {
+      throw Error(`Column ${table}.${column} must be a string`);
+    }
+  }
+  else if (meta.type === 'boolean') {
+    if (typeof value !== 'boolean') {
+      throw Error(`Column ${table}.${column} must be a boolean`);
+    }
+  }
+  else if (meta.type === 'date') {
+    if (!(value instanceof Date)) {
+      throw Error(`Column ${table}.${column} must be a Date`);
+    }
+  }
+  else if (meta.type === 'blob') {
+    if (typeof Buffer === 'undefined' || !Buffer.isBuffer(value)) {
+      throw Error(`Column ${table}.${column} must be a Buffer`);
+    }
+  }
+  else if (meta.type === 'json') {
+    if (!isPlainObject(value) && !Array.isArray(value)) {
+      throw Error(`Column ${table}.${column} must be a JSON object or array`);
+    }
+  }
+}
+
+const validateMissing = (table, info, values) => {
+  const missing = [];
+  for (const [name, meta] of Object.entries(info)) {
+    if (meta.computed) {
+      continue;
+    }
+    const provided = Object.prototype.hasOwnProperty.call(values, name) && values[name] !== undefined;
+    if (!provided) {
+      const autoIntegerPk = meta.primaryKey && meta.type === 'integer';
+      const hasDefault = meta.default !== undefined;
+      if (meta.notNull && !hasDefault && !autoIntegerPk) {
+        missing.push(name);
+      }
+      continue;
+    }
+  }
+  if (missing.length > 0) {
+    const plural = missing.length > 1 ? 's' : '';
+    throw Error(`Missing required value${plural} for ${table}: ${missing.join(', ')}`);
+  }
+}
+
+const validateInsertValues = (db, table, values) => {
+  const info = db.columnInfo?.[table];
+  if (!info) {
+    return;
+  }
+  validateMissing(table, info, values);
+  for (const [name, value] of Object.entries(values)) {
+    const meta = info[name];
+    if (!meta || meta.computed) {
+      continue;
+    }
+    validateValueType(db, table, name, value, meta);
+  }
+}
+
+const validateUpdateValues = (db, table, values) => {
+  const info = db.columnInfo?.[table];
+  if (!info) {
+    return;
+  }
+  for (const [name, value] of Object.entries(values)) {
+    const meta = info[name];
+    if (!meta || meta.computed) {
+      continue;
+    }
+    if (typeof value === 'function') {
+      continue;
+    }
+    validateValueType(db, table, name, value, meta);
+  }
+}
+
 const makeInsertSql = (db, table, query, params) => {
   const columns = Object.keys(query);
   const columnTypes = db.columns[table];
@@ -179,6 +286,10 @@ const upsert = async (args) => {
   } = args;
   const { values, target, set } = options;
   const params = {};
+  validateInsertValues(db, table, values);
+  if (set) {
+    validateUpdateValues(db, table, set);
+  }
   const query = adjust(db, table, values);
   let sql = makeInsertSql(db, table, query, params);
   verify(Object.keys(values));
@@ -204,6 +315,7 @@ const insert = async (args) => {
     values,
     tx
   } = args;
+  validateInsertValues(db, table, values);
   const columns = Object.keys(values);
   verify(columns);
   const adjusted = adjust(db, table, values);
@@ -217,6 +329,7 @@ const insert = async (args) => {
 const batchInserts = async (tx, db, table, items) => {
   const inserts = [];
   for (const item of items) {
+    validateInsertValues(db, table, item);
     const params = {};
     const adjusted = adjust(db, table, item);
     const sql = makeInsertSql(db, table, adjusted, params);
@@ -242,6 +355,9 @@ const insertMany = async (args) => {
   } = args;
   if (items.length === 0) {
     return;
+  }
+  for (const item of items) {
+    validateInsertValues(db, table, item);
   }
   const columnTypes = db.columns[table];
   const sample = items[0];
@@ -358,6 +474,7 @@ const update = async (args) => {
   const { where, set } = options;
   const keys = Object.keys(set);
   verify(keys);
+  validateUpdateValues(db, table, set);
   const params = {};
   const query = adjust(db, table, set);
   const setString = createSetClause(db, table, query, params);
