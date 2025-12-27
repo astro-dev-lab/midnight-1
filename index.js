@@ -4,6 +4,7 @@ import TursoDatabase from './src/turso.js';
 import { 
   BaseTable, 
   Table, 
+  SoftDeleteTable,
   FTSTable, 
   ExternalFTSTable,
   Unicode61,
@@ -20,6 +21,7 @@ export {
   ExternalFTSTable,
   BaseTable,
   Table,
+  SoftDeleteTable,
   Unicode61,
   Ascii,
   Trigram,
