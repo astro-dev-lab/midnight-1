@@ -8,7 +8,9 @@ import {
   aggregate,
   match,
   all,
-  remove
+  remove,
+  softDelete,
+  restore
 } from './queries.js';
 
 const groupMethods = (args) => {
@@ -40,7 +42,11 @@ const basic = {
   match: (args) => async (query, config) => await match({ query, ...config, ...args }),
   query: (args) => async (query, config) => await all({ query, type: 'complex', ...config, ...args }),
   first: (args) => async (query, config) => await all({ query, first: true, type: 'complex', ...config, ...args }),
-  delete: (args) => async (query) => await remove({ query, ...args })
+  delete: (args) => async (query) => await remove({ query, ...args }),
+  softDelete: (args) => async (query) => await softDelete({ query, ...args }),
+  restore: (args) => async (query) => await restore({ query, ...args }),
+  withDeleted: (args) => async (query, columns, config) => await all({ query, columns, withDeleted: true, ...config, ...args }),
+  onlyDeleted: (args) => async (query, columns, config) => await all({ query, columns, onlyDeleted: true, ...config, ...args })
 }
 
 const getConverters = (key, value, db, converters, keys = [], optional = []) => {

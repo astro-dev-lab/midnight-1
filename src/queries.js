@@ -1275,6 +1275,81 @@ const remove = async (args) => {
   return await db.run(options);
 }
 
+/**
+ * Soft delete - sets deletedAt to current timestamp
+ */
+const softDelete = async (args) => {
+  const { 
+    db,
+    table,
+    query,
+    tx
+  } = args;
+  
+  if (!db.softDeleteTables.has(table)) {
+    throw new Error(`Table "${table}" does not support soft delete. Extend SoftDeleteTable instead of Table.`);
+  }
+  
+  const now = new Date().toISOString();
+  let sql = `update ${table} set deletedAt = '${now}'`;
+  const params = {};
+  const clause = toWhere({
+    table,
+    query,
+    params
+  });
+  if (clause) {
+    sql += ` where ${clause}`;
+  }
+  // Only soft delete records that aren't already deleted
+  sql += clause ? ' and deletedAt is null' : ' where deletedAt is null';
+  
+  const options = {
+    query: sql,
+    params,
+    tx,
+    operation: 'softDelete'
+  };
+  return await db.run(options);
+}
+
+/**
+ * Restore soft-deleted records - sets deletedAt back to null
+ */
+const restore = async (args) => {
+  const { 
+    db,
+    table,
+    query,
+    tx
+  } = args;
+  
+  if (!db.softDeleteTables.has(table)) {
+    throw new Error(`Table "${table}" does not support soft delete. Extend SoftDeleteTable instead of Table.`);
+  }
+  
+  let sql = `update ${table} set deletedAt = null`;
+  const params = {};
+  const clause = toWhere({
+    table,
+    query,
+    params
+  });
+  if (clause) {
+    sql += ` where ${clause}`;
+  }
+  // Only restore records that are actually deleted
+  sql += clause ? ' and deletedAt is not null' : ' where deletedAt is not null';
+  
+  const options = {
+    query: sql,
+    params,
+    tx,
+    operation: 'restore'
+  };
+  return await db.run(options);
+}
+
 export {
   insert,
   insertMany,
@@ -1285,5 +1360,7 @@ export {
   aggregate,
   match,
   all,
-  remove
+  remove,
+  softDelete,
+  restore
 }
