@@ -1,5 +1,6 @@
 # 🌒 Midnight
-```
+
+```text
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⠁⠸⢳⡄⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⠃⠀⠀⢸⠸⠀⡠⣄⠀⠀⠀⠀⠀
@@ -19,6 +20,7 @@
 ⠀⠀⠀⠀⡇⣿⡅⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⠦⠀⠀⠀⠀⠀⠀⡇⢹⢿⡀
 ⠀⠀⠀⠀⠁⠛⠓⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠼⠇⠁
 ```
+
 The time after the 11th hour. Midnight is a NodeJS ORM for SQLite and Turso with full TypeScript support without needing to generate any code. Even complex SQL queries can be written inside of JavaScript.
 
 Tables are written in JavaScript like this:
@@ -73,7 +75,7 @@ This syntax allows you to perform queries that usually aren't possible in ORMs.
 
 ## Getting started
 
-```
+```bash
 npm install @andrewitsover/midnight
 ```
 
@@ -209,15 +211,15 @@ The second argument to ```get``` or ```many``` selects which columns to return. 
 
 1. a string representing a column to select. In this case, the result returned is a single value or array of single values, depending on whether ```get``` or ```many``` is used.
 
-```js
-const planted = await db.trees.get({ id: 3 }, 'planted');
-```
+   ```js
+   const planted = await db.trees.get({ id: 3 }, 'planted');
+   ```
 
 2. an array of strings, representing the columns to select.
 
-```js
-const tree = await db.trees.get({ id: 3 }, ['id', 'born']);
-```
+   ```js
+   const tree = await db.trees.get({ id: 3 }, ['id', 'born']);
+   ```
 
 ### Query and First
 
