@@ -45,27 +45,31 @@ class SQLiteDatabase extends Database {
     const exists = existsSync(this.dbPath);
     this.read = await this.createDatabase();
     this.write = await this.createDatabase();
+    this.initialized = true;
     if (!exists) {
       this.created = true;
-      await this.pragma(null, 'journal_mode=WAL');
+      this.write.pragma('journal_mode=WAL');
     }
-    this.initialized = true;
   }
 
   async migrate(sql) {
     if (!this.initialized) {
       await this.initialize();
     }
-    const tx = await this.getTransaction();
+    const lock = await this.getWriter();
     try {
-      await tx.begin();
-      await tx.deferForeignKeys();
-      await tx.exec(sql);
-      await tx.commit();
+      this.write.exec('begin');
+      this.write.pragma('defer_foreign_keys = true');
+      this.write.exec(sql);
+      this.write.exec('commit');
     }
     catch (e) {
-      await tx.rollback();
+      this.write.exec('rollback');
       throw e;
+    }
+    finally {
+      this.writer = null;
+      lock.resolve();
     }
   }
 
