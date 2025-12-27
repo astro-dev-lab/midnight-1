@@ -1232,6 +1232,15 @@ export class Table extends BaseTable {
   id: PkNumber;
 }
 
+/**
+ * Table with soft delete functionality.
+ * Adds a nullable `deletedAt` Date column.
+ * Queries automatically filter deleted records unless `withDeleted` or `onlyDeleted` is used.
+ */
+export class SoftDeleteTable extends Table {
+  deletedAt: DbDate | null;
+}
+
 interface Unicode61Config {
   removeDiacritics?: boolean;
   categories?: string[];
