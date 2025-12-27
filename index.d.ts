@@ -587,8 +587,27 @@ interface QueryOptions {
   parse: boolean;
 }
 
+export interface LogOptions {
+  maxStringLength?: number;
+  redact?: (value: any) => any;
+}
+
+export interface QueryLogEvent {
+  sql: string;
+  params?: Record<string, any>;
+  durationMs?: number;
+  method?: string;
+  tx?: boolean;
+  write?: boolean;
+  error?: unknown;
+}
+
+export type QueryLogger = (event: QueryLogEvent) => void;
+
 interface DatabaseConfig {
   debug?: boolean;
+  logger?: QueryLogger;
+  logOptions?: LogOptions;
 }
 
 interface SQLiteConfig extends DatabaseConfig {
@@ -1206,13 +1225,15 @@ export class ExternalFTSTable extends FTSTable {
 }
 
 export class Database {
-  constructor();
+  constructor(options?: DatabaseConfig);
   run(args: { query: any, params?: any }): Promise<number>;
   all<T>(args: { query: any, params?: any, options?: QueryOptions }): Promise<Array<T>>;
   exec(query: string): Promise<void>;
   begin(): Promise<void>;
   commit(): Promise<void>;
   rollback(): Promise<void>;
+  setLogger(logger: QueryLogger, options?: LogOptions): void;
+  explain(expression: any): Promise<Array<any>>;
 }
 
 export class SQLiteDatabase extends Database {

@@ -16,7 +16,7 @@ const dbTypes = {
 }
 
 class Database {
-  constructor() {
+  constructor(options = {}) {
     this.write = null;
     this.tables = {};
     this.mappers = {};
@@ -29,6 +29,8 @@ class Database {
     this.virtualSet = new Set();
     this.closed = false;
     this.initialized = false;
+    this.logger = options.logger || null;
+    this.logOptions = options.logOptions || {};
     this.registerTypes([
       {
         name: 'boolean',
@@ -147,6 +149,109 @@ class Database {
         this.customTypes[name] = options;
       }
     }
+  }
+
+  setLogger(logger, options = {}) {
+    this.logger = logger;
+    this.logOptions = { ...this.logOptions, ...options };
+  }
+
+  now() {
+    if (typeof performance !== 'undefined' && performance.now) {
+      return performance.now();
+    }
+    return Date.now();
+  }
+
+  elapsed(start) {
+    return this.now() - start;
+  }
+
+  safeValue(value) {
+    const customRedactor = this.logOptions.redact;
+    if (typeof customRedactor === 'function') {
+      return customRedactor(value);
+    }
+    if (value === null || value === undefined) {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const limit = this.logOptions.maxStringLength || 200;
+      if (value.length > limit) {
+        return `${value.slice(0, limit)}...(${value.length})`;
+      }
+      return value;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return value;
+    }
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+    if (typeof Buffer !== 'undefined' && Buffer.isBuffer(value)) {
+      return `[buffer ${value.length}]`;
+    }
+    if (Array.isArray(value)) {
+      return value.map(v => this.safeValue(v));
+    }
+    if (typeof value === 'object') {
+      return '[object]';
+    }
+    return '[redacted]';
+  }
+
+  redactParams(params) {
+    if (!params || typeof params !== 'object') {
+      return params;
+    }
+    const result = Array.isArray(params) ? [] : {};
+    for (const [key, value] of Object.entries(params)) {
+      result[key] = this.safeValue(value);
+    }
+    return result;
+  }
+
+  getSqlText(query) {
+    if (typeof query === 'string') {
+      return query;
+    }
+    if (query && typeof query === 'object') {
+      if (typeof query.source === 'string') {
+        return query.source;
+      }
+      if (typeof query.sql === 'string') {
+        return query.sql;
+      }
+    }
+    return '[statement]';
+  }
+
+  logQuery(event) {
+    if (!this.logger) {
+      return;
+    }
+    const { params, ...rest } = event;
+    const payload = {
+      ...rest,
+      params: this.redactParams(params)
+    };
+    try {
+      this.logger(payload);
+    }
+    catch (e) {
+      // Ignore logger errors to avoid breaking query flow.
+    }
+  }
+
+  async explain(expression, tx) {
+    const details = typeof expression === 'string'
+      ? { sql: expression, params: {} }
+      : processQuery(this, expression);
+    return await this._explain(details.sql, details.params || {}, tx);
+  }
+
+  async _explain() {
+    throw Error('Explain not implemented for this driver');
   }
 
   needsParsing(table, keys) {

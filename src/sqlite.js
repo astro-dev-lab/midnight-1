@@ -218,7 +218,10 @@ class SQLiteDatabase extends Database {
     if (!this.initialized) {
       await this.initialize();
     }
-    let { query, params, tx, adjusted } = props;
+    let { query, params, tx, adjusted, operation } = props;
+    const op = operation || 'run';
+    const sqlText = this.getSqlText(query);
+    const start = this.now();
     if (params === null) {
       params = undefined;
     }
@@ -247,19 +250,48 @@ class SQLiteDatabase extends Database {
     if (!tx) {
       lock = await this.getWriter();
     }
-    const result = isEmpty(params) ? query.run() : query.run(params);
-    if (lock) {
-      this.writer = null;
-      lock.resolve();
+    try {
+      const result = isEmpty(params) ? query.run() : query.run(params);
+      if (lock) {
+        this.writer = null;
+        lock.resolve();
+      }
+      this.logQuery({
+        sql: sqlText,
+        params,
+        durationMs: this.elapsed(start),
+        method: op,
+        tx: Boolean(tx),
+        write: true
+      });
+      return result.changes;
     }
-    return result.changes;
+    catch (error) {
+      if (lock) {
+        this.writer = null;
+        lock.resolve();
+      }
+      this.logQuery({
+        sql: sqlText,
+        params,
+        durationMs: this.elapsed(start),
+        method: op,
+        tx: Boolean(tx),
+        write: true,
+        error
+      });
+      throw error;
+    }
   }
 
   async all(props) {
     if (!this.initialized) {
       await this.initialize();
     }
-    let { query, params, options, tx, write, adjusted } = props;
+    let { query, params, options, tx, write, adjusted, operation } = props;
+    const op = operation || 'all';
+    const sqlText = this.getSqlText(query);
+    const start = this.now();
     if (params === null) {
       params = undefined;
     }
@@ -299,12 +331,50 @@ class SQLiteDatabase extends Database {
     if (!tx && write) {
       lock = await this.getWriter();
     }
-    const rows = isEmpty(params) ? query.all() : query.all(params);
-    if (lock) {
-      this.writer = null;
-      lock.resolve();
+    try {
+      const rows = isEmpty(params) ? query.all() : query.all(params);
+      if (lock) {
+        this.writer = null;
+        lock.resolve();
+      }
+      const result = process(rows, options);
+      this.logQuery({
+        sql: sqlText,
+        params,
+        durationMs: this.elapsed(start),
+        method: op,
+        tx: Boolean(tx),
+        write: Boolean(write)
+      });
+      return result;
     }
-    return process(rows, options);
+    catch (error) {
+      if (lock) {
+        this.writer = null;
+        lock.resolve();
+      }
+      this.logQuery({
+        sql: sqlText,
+        params,
+        durationMs: this.elapsed(start),
+        method: op,
+        tx: Boolean(tx),
+        write: Boolean(write),
+        error
+      });
+      throw error;
+    }
+  }
+
+  async _explain(sql, params = {}, tx) {
+    const planSql = `explain query plan ${sql}`;
+    const options = {
+      query: planSql,
+      params,
+      tx,
+      operation: 'explain'
+    };
+    return await this.all(options);
   }
 
   async exec(tx, sql) {

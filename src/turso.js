@@ -83,10 +83,13 @@ class TursoDatabase extends Database {
   }
 
   async run(props) {
-    let { query, params, adjusted, tx } = props;
+    let { query, params, adjusted, tx, operation } = props;
+    const op = operation || 'run';
+    const sqlText = this.getSqlText(query);
+    const start = this.now();
     const isBatch = tx && tx.isBatch;
     if (props.statement && !isBatch) {
-      return await this.raw.execute(statement);
+      return await this.raw.execute(props.statement);
     }
     if (params === null) {
       params = undefined;
@@ -101,14 +104,39 @@ class TursoDatabase extends Database {
     if (isBatch) {
       return statement;
     }
-    await this.raw.execute(statement);
+    try {
+      await this.raw.execute(statement);
+      this.logQuery({
+        sql: sqlText,
+        params,
+        durationMs: this.elapsed(start),
+        method: op,
+        tx: Boolean(tx),
+        write: true
+      });
+    }
+    catch (error) {
+      this.logQuery({
+        sql: sqlText,
+        params,
+        durationMs: this.elapsed(start),
+        method: op,
+        tx: Boolean(tx),
+        write: true,
+        error
+      });
+      throw error;
+    }
   }
 
   async all(props) {
-    let { query, params, options, adjusted, tx } = props;
+    let { query, params, options, adjusted, tx, operation } = props;
+    const op = operation || 'all';
+    const sqlText = this.getSqlText(query);
+    const start = this.now();
     const isBatch = tx && tx.isBatch;
     if (props.statement && !isBatch) {
-      const meta = await this.raw.execute(statement);
+      const meta = await this.raw.execute(props.statement);
       return this.process(meta.rows, options);
     }
     if (params === null) {
@@ -127,8 +155,40 @@ class TursoDatabase extends Database {
         post: (meta) => this.process(meta.rows, options)
       }
     }
-    const meta = await this.raw.execute(statement);
-    return this.process(meta.rows, options);
+    try {
+      const meta = await this.raw.execute(statement);
+      const result = this.process(meta.rows, options);
+      this.logQuery({
+        sql: sqlText,
+        params,
+        durationMs: this.elapsed(start),
+        method: op,
+        tx: Boolean(tx)
+      });
+      return result;
+    }
+    catch (error) {
+      this.logQuery({
+        sql: sqlText,
+        params,
+        durationMs: this.elapsed(start),
+        method: op,
+        tx: Boolean(tx),
+        error
+      });
+      throw error;
+    }
+  }
+
+  async _explain(sql, params = {}, tx) {
+    const plan = `explain query plan ${sql}`;
+    const options = {
+      query: plan,
+      params,
+      tx,
+      operation: 'explain'
+    };
+    return await this.all(options);
   }
 
   async exec(sql) {

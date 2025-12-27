@@ -161,6 +161,12 @@ const makeQueryHandler = (options) => {
 const makeClient = (db, tx) => {
   const tableHandler = {
     get: function(target, table, dbClient) {
+        if (table === 'explain') {
+          return (expression) => db.explain(expression, tx);
+        }
+        if (table === 'setLogger') {
+          return (logger, options) => db.setLogger(logger, options);
+        }
       if (table === 'query' || table === 'queryValues') {
         return (expression) => db.query(expression, tx);
       }
