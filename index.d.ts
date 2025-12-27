@@ -1001,6 +1001,22 @@ type GetDefined<T> =
       : ToJsType<V> | null
     : never);
 
+/** Options for enabling the query cache */
+interface CacheOptions {
+  /** Default TTL in milliseconds (default: 60000) */
+  ttl?: number;
+}
+
+/** Cache statistics */
+interface CacheStats {
+  hits: number;
+  misses: number;
+  invalidations: number;
+  size: number;
+  enabled: boolean;
+  hitRate: string;
+}
+
 interface TypedDb<P, C, N> {
   exec(sql: string): Promise<void>;
   begin(type?: N): Promise<TypedDb<P, C, N> & P>;
@@ -1018,6 +1034,16 @@ interface TypedDb<P, C, N> {
   batch<T extends any[]>(batcher: (bx: TypedDb<P, C, N> & P) => T): Promise<Unwrap<T>>;
   batch<T extends any[]> (type: 'read' | 'write', batcher: (bx: TypedDb<P, C, N> & P) => T): Promise<Unwrap<T>>;
   sync(): Promise<void>;
+  /** Enable or disable query result caching */
+  enableCache(enabled?: boolean, options?: CacheOptions): void;
+  /** Clear all cached query results */
+  clearCache(): void;
+  /** Get cache statistics */
+  getCacheStats(): CacheStats;
+  /** Reset cache statistics */
+  resetCacheStats(): void;
+  /** Invalidate cache for specific table(s) */
+  invalidateCache(tables: string | string[]): void;
   first<S extends SelectType, K extends ObjectReturn<S>, T extends (context: SubqueryContext & C) => K>(expression: T): Promise<ToJsType<ReturnType<T>['select'] & ReturnType<T>['distinct'] & MakeOptional<NonNullable<ReturnType<T>['optional']>>> | undefined>;
   firstValue<S extends SelectType, K extends ValueReturn<S>, T extends (context: SubqueryContext & C) => K>(expression: T): Promise<GetDefined<ReturnType<T>> | undefined>;
   query<S extends SelectType, K extends ObjectReturn<S>, T extends (context: SubqueryContext & C) => K>(expression: T): Promise<ToJsType<ReturnType<T>['select'] & ReturnType<T>['distinct'] & MakeOptional<NonNullable<ReturnType<T>['optional']>>>[]>;

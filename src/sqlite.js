@@ -344,6 +344,10 @@ class SQLiteDatabase extends Database {
         this.writer = null;
         lock.resolve();
       }
+      
+      // Invalidate cache for affected tables
+      this.invalidateCache(this.extractTablesFromSql(sqlText));
+      
       this.logQuery({
         sql: sqlText,
         params,
@@ -419,6 +423,25 @@ class SQLiteDatabase extends Database {
     if (!tx && write) {
       lock = await this.getWriter();
     }
+    
+    // Check cache for read queries (not in transaction, not write)
+    const canCache = !tx && !write && this.cacheEnabled;
+    if (canCache) {
+      const cached = this.getCached(sqlText, params);
+      if (cached !== null) {
+        this.logQuery({
+          sql: sqlText,
+          params,
+          durationMs: 0,
+          method: op,
+          tx: false,
+          write: false,
+          cached: true
+        });
+        return cached;
+      }
+    }
+    
     try {
       const rows = isEmpty(params) ? query.all() : query.all(params);
       if (lock) {
@@ -426,6 +449,12 @@ class SQLiteDatabase extends Database {
         lock.resolve();
       }
       const result = process(rows, options);
+      
+      // Store in cache for read queries
+      if (canCache) {
+        this.setCached(sqlText, params, result);
+      }
+      
       this.logQuery({
         sql: sqlText,
         params,

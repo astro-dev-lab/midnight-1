@@ -190,6 +190,10 @@ const makeClient = (db, tx) => {
         db[table] = db[table].bind(db);
         return db[table];
       }
+      // Cache methods
+      if (['enableCache', 'clearCache', 'getCacheStats', 'resetCacheStats', 'invalidateCache'].includes(table)) {
+        return (...args) => db[table](...args);
+      }
       if (table === 'use') {
         return (subquery) => {
           return new Proxy({}, makeQueryHandler({ 
