@@ -35,6 +35,13 @@ class Database {
     this.initialized = false;
     this.logger = options.logger || null;
     this.logOptions = options.logOptions || {};
+    
+    // Query cache
+    this.cache = new Map();
+    this.cacheEnabled = false;
+    this.cacheDefaultTTL = 60000; // 60 seconds default
+    this.cacheStats = { hits: 0, misses: 0, invalidations: 0 };
+    
     this.registerTypes([
       {
         name: 'boolean',
@@ -169,6 +176,144 @@ class Database {
   setLogger(logger, options = {}) {
     this.logger = logger;
     this.logOptions = { ...this.logOptions, ...options };
+  }
+
+  // ---- Query Cache Methods ----
+
+  /**
+   * Enable or disable caching with optional default TTL
+   * @param {boolean} enabled - Whether to enable caching
+   * @param {Object} options - Cache options
+   * @param {number} options.ttl - Default TTL in milliseconds (default: 60000)
+   */
+  enableCache(enabled = true, options = {}) {
+    this.cacheEnabled = enabled;
+    if (options.ttl !== undefined) {
+      this.cacheDefaultTTL = options.ttl;
+    }
+    if (!enabled) {
+      this.clearCache();
+    }
+  }
+
+  /**
+   * Generate a cache key from SQL and params
+   */
+  getCacheKey(sql, params) {
+    const paramStr = params ? JSON.stringify(params) : '';
+    return `${sql}|${paramStr}`;
+  }
+
+  /**
+   * Get a cached result if valid
+   */
+  getCached(sql, params) {
+    if (!this.cacheEnabled) return null;
+    
+    const key = this.getCacheKey(sql, params);
+    const entry = this.cache.get(key);
+    
+    if (!entry) {
+      this.cacheStats.misses++;
+      return null;
+    }
+    
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(key);
+      this.cacheStats.misses++;
+      return null;
+    }
+    
+    this.cacheStats.hits++;
+    return entry.data;
+  }
+
+  /**
+   * Store a result in the cache
+   */
+  setCached(sql, params, data, ttl) {
+    if (!this.cacheEnabled) return;
+    
+    const key = this.getCacheKey(sql, params);
+    const effectiveTTL = ttl !== undefined ? ttl : this.cacheDefaultTTL;
+    
+    this.cache.set(key, {
+      data: structuredClone(data), // Clone to prevent mutation
+      expiresAt: Date.now() + effectiveTTL,
+      tables: this.extractTablesFromSql(sql)
+    });
+  }
+
+  /**
+   * Extract table names from SQL (simple heuristic)
+   */
+  extractTablesFromSql(sql) {
+    const tables = new Set();
+    // Match "from table" and "join table" patterns
+    const fromMatch = sql.match(/from\s+(\w+)/gi);
+    const joinMatch = sql.match(/join\s+(\w+)/gi);
+    
+    if (fromMatch) {
+      fromMatch.forEach(m => {
+        const table = m.split(/\s+/)[1];
+        if (table && !table.startsWith('(')) tables.add(table);
+      });
+    }
+    if (joinMatch) {
+      joinMatch.forEach(m => {
+        const table = m.split(/\s+/)[1];
+        if (table) tables.add(table);
+      });
+    }
+    
+    return tables;
+  }
+
+  /**
+   * Invalidate cache entries for affected tables
+   */
+  invalidateCache(tables) {
+    if (!this.cacheEnabled || this.cache.size === 0) return;
+    
+    const tablesToInvalidate = Array.isArray(tables) ? new Set(tables) : new Set([tables]);
+    
+    for (const [key, entry] of this.cache.entries()) {
+      for (const table of entry.tables) {
+        if (tablesToInvalidate.has(table)) {
+          this.cache.delete(key);
+          this.cacheStats.invalidations++;
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Clear all cached entries
+   */
+  clearCache() {
+    this.cache.clear();
+  }
+
+  /**
+   * Get cache statistics
+   */
+  getCacheStats() {
+    return {
+      ...this.cacheStats,
+      size: this.cache.size,
+      enabled: this.cacheEnabled,
+      hitRate: this.cacheStats.hits + this.cacheStats.misses > 0
+        ? (this.cacheStats.hits / (this.cacheStats.hits + this.cacheStats.misses) * 100).toFixed(2) + '%'
+        : '0%'
+    };
+  }
+
+  /**
+   * Reset cache statistics
+   */
+  resetCacheStats() {
+    this.cacheStats = { hits: 0, misses: 0, invalidations: 0 };
   }
 
   now() {
