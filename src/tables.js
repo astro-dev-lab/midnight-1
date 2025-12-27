@@ -315,6 +315,14 @@ class Table extends BaseTable {
   id = this.IntPrimary;
 }
 
+/**
+ * Mixin to add soft delete functionality to a table.
+ * Adds a nullable `deletedAt` Date column.
+ */
+class SoftDeleteTable extends Table {
+  deletedAt = this.Null(this.Date);
+}
+
 class FTSTable extends BaseTable {
   rowid = this.IntPrimary;
   Tokenizer = new Unicode61({ removeDiacritics: true });
@@ -359,9 +367,11 @@ const process = (Custom) => {
   const name = removeCapital(Custom.name);
   const type = Custom.prototype instanceof FTSTable ? 'fts5' : 'base';
   const external = Custom.prototype instanceof ExternalFTSTable;
+  const softDelete = Custom.prototype instanceof SoftDeleteTable;
   const table = {
     name,
     type,
+    softDelete,
     columns: [],
     computed: [],
     indexes: [],

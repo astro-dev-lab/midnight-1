@@ -27,6 +27,7 @@ class Database {
     this.columnInfo = {};
     this.hasJson = {};
     this.computed = {};
+    this.softDeleteTables = new Set();
     this.schema = [];
     this.statements = new Map();
     this.virtualSet = new Set();
@@ -121,6 +122,9 @@ class Database {
     for (const table of this.schema) {
       if (table.type === 'fts5') {
         this.virtualSet.add(table.name);
+      }
+      if (table.softDelete) {
+        this.softDeleteTables.add(table.name);
       }
       this.tables[table.name] = table.columns;
       this.columns[table.name] = {};

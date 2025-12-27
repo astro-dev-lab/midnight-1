@@ -426,6 +426,55 @@ The client returned from ```getClient``` has three methods that can be used to c
 
 See the [sample project](https://github.com/andrewitsover/midnight-tutorial) for an example of how to use these functions to create a migration system.
 
+### Migration safety
+
+For safer migrations, especially in production, Midnight provides several helpers:
+
+**Dry run**: Preview migration SQL without executing:
+
+```js
+const result = await db.migrate(sql, { dryRun: true });
+console.log(result.statements); // Array of SQL statements
+```
+
+**Analyze migrations**: Detect destructive operations before running:
+
+```js
+import { analyzeMigration } from '@andrewitsover/midnight';
+
+const analysis = analyzeMigration(sql);
+console.log(analysis.isDestructive);  // true if drops/recreates tables
+console.log(analysis.dropTables);     // ['users']
+console.log(analysis.dropColumns);    // [{ table: 'posts', column: 'body' }]
+console.log(analysis.recreatedTables); // tables being recreated (column type changes)
+```
+
+**Backup and restore**: Create database snapshots:
+
+```js
+// Create a backup
+await db.backup('/path/to/backup.db');
+
+// Auto-timestamped safety backup
+const { path } = await db.safetyBackup();
+// => /path/to/db.backup-2025-01-15T10-30-00-000Z
+
+// Restore from backup
+await db.restore('/path/to/backup.db');
+```
+
+**Safe migrate**: Auto-backup before destructive migrations:
+
+```js
+const result = await db.safeMigrate(sql);
+// result.success: boolean
+// result.analysis: migration analysis
+// result.backup: backup info if destructive (null otherwise)
+
+// Disable auto-backup
+await db.safeMigrate(sql, { autoBackup: false });
+```
+
 ## Creating tables
 
 In addition to the built-in SQLite types of ```Integer```, ```Real```, ```Text```, and ```Blob```, Midnight adds a few extra types. ```Boolean``` is stored in the database as a 1 or a 0, ```Date``` is stored as an ISO8601 string, and ```Json``` is a JSONB blob.
