@@ -1,5 +1,52 @@
 import { toSql, columnToSql, indexToSql, toHash } from './tables.js'
 
+/**
+ * Analyze migration SQL to detect potentially destructive operations
+ */
+export const analyzeMigration = (sql) => {
+  const lines = sql.split('\n').filter(l => l.trim().length > 0);
+  const operations = {
+    dropTables: [],
+    dropColumns: [],
+    recreatedTables: [],
+    addColumns: [],
+    addTables: [],
+    isDestructive: false
+  };
+  
+  for (const line of lines) {
+    const lower = line.toLowerCase().trim();
+    
+    if (lower.startsWith('drop table ')) {
+      const match = line.match(/drop table (\w+)/i);
+      if (match) operations.dropTables.push(match[1]);
+    }
+    else if (lower.includes('drop column ')) {
+      const match = line.match(/alter table (\w+) drop column (\w+)/i);
+      if (match) operations.dropColumns.push({ table: match[1], column: match[2] });
+    }
+    else if (lower.startsWith('create table temp_')) {
+      const match = line.match(/create table temp_(\w+)/i);
+      if (match) operations.recreatedTables.push(match[1]);
+    }
+    else if (lower.includes('add column ')) {
+      const match = line.match(/alter table (\w+) add column (\w+)/i);
+      if (match) operations.addColumns.push({ table: match[1], column: match[2] });
+    }
+    else if (lower.startsWith('create table ') && !lower.includes('temp_')) {
+      const match = line.match(/create table (?:if not exists )?(\w+)/i);
+      if (match) operations.addTables.push(match[1]);
+    }
+  }
+  
+  operations.isDestructive = 
+    operations.dropTables.length > 0 ||
+    operations.dropColumns.length > 0 ||
+    operations.recreatedTables.length > 0;
+  
+  return operations;
+};
+
 const recreate = (table, current) => {
   const temp = `temp_${table.name}`;
   let sql = toSql({ ...table, name: temp, indexes: [] });

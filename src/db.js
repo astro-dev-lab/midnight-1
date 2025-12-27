@@ -4,7 +4,9 @@ import { mapOne, mapMany } from './map.js';
 import { makeClient } from './proxy.js';
 import { processQuery } from './symbols.js';
 import { process, toSql } from './tables.js';
-import toMigration from './migrate.js';
+import toMigration, { analyzeMigration } from './migrate.js';
+
+export { analyzeMigration };
 
 const dbTypes = {
   integer: true,

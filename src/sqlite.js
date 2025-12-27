@@ -1,7 +1,7 @@
 import Database from './db.js';
 import sqlite3 from 'better-sqlite3';
 import { makeClient } from './proxy.js';
-import { existsSync } from 'fs';
+import { existsSync, copyFileSync, unlinkSync } from 'fs';
 
 const isEmpty = (params) => {
   if (params === undefined) {
@@ -52,7 +52,17 @@ class SQLiteDatabase extends Database {
     }
   }
 
-  async migrate(sql) {
+  async migrate(sql, options = {}) {
+    const { dryRun = false } = options;
+    
+    // In dry-run mode, just return the SQL that would be executed
+    if (dryRun) {
+      return {
+        sql,
+        statements: sql.split(';').map(s => s.trim()).filter(s => s.length > 0)
+      };
+    }
+    
     if (!this.initialized) {
       await this.initialize();
     }
@@ -70,6 +80,80 @@ class SQLiteDatabase extends Database {
     finally {
       this.writer = null;
       lock.resolve();
+    }
+  }
+
+  async backup(destPath) {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+    // Acquire writer lock to ensure no writes during backup
+    const lock = await this.getWriter();
+    try {
+      // Use SQLite's backup API for a consistent snapshot
+      await this.write.backup(destPath);
+      return { success: true, path: destPath };
+    }
+    finally {
+      this.writer = null;
+      lock.resolve();
+    }
+  }
+
+  async restore(sourcePath) {
+    if (!existsSync(sourcePath)) {
+      throw new Error(`Backup file not found: ${sourcePath}`);
+    }
+    
+    // Close existing connections
+    if (this.initialized) {
+      await this.close();
+    }
+    
+    // Replace database file with backup
+    copyFileSync(sourcePath, this.dbPath);
+    
+    // Reset state and reinitialize
+    this.initialized = false;
+    this.closed = false;
+    this.statements.clear();
+    await this.initialize();
+    
+    return { success: true, restoredFrom: sourcePath };
+  }
+
+  async safetyBackup() {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupPath = `${this.dbPath}.backup-${timestamp}`;
+    return await this.backup(backupPath);
+  }
+
+  async safeMigrate(sql, options = {}) {
+    const { analyzeMigration } = await import('./migrate.js');
+    const analysis = analyzeMigration(sql);
+    
+    let backupResult = null;
+    
+    // Auto-backup if migration is destructive (unless explicitly disabled)
+    if (analysis.isDestructive && options.autoBackup !== false) {
+      backupResult = await this.safetyBackup();
+    }
+    
+    try {
+      await this.migrate(sql);
+      return {
+        success: true,
+        analysis,
+        backup: backupResult
+      };
+    }
+    catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        analysis,
+        backup: backupResult
+      };
     }
   }
 

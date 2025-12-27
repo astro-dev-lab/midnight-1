@@ -10,6 +10,7 @@ import {
   Ascii,
   Trigram
 } from './src/tables.js';
+import { analyzeMigration } from './src/migrate.js';
 
 export {
   Database,
@@ -21,5 +22,6 @@ export {
   Table,
   Unicode61,
   Ascii,
-  Trigram
+  Trigram,
+  analyzeMigration
 }

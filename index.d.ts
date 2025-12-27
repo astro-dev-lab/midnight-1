@@ -1,5 +1,53 @@
 type ExtractKeys<U> = U extends Record<string, any> ? keyof U : keyof {};
 
+/** Options for the migrate() method */
+interface MigrateOptions {
+  /** If true, returns the SQL without executing it */
+  dryRun?: boolean;
+}
+
+/** Result of a dry-run migration */
+interface DryRunResult {
+  sql: string;
+  statements: string[];
+}
+
+/** Analysis of migration operations */
+interface MigrationAnalysis {
+  dropTables: string[];
+  dropColumns: Array<{ table: string; column: string }>;
+  recreatedTables: string[];
+  addColumns: Array<{ table: string; column: string }>;
+  addTables: string[];
+  isDestructive: boolean;
+}
+
+/** Result of backup operation */
+interface BackupResult {
+  success: boolean;
+  path: string;
+}
+
+/** Result of restore operation */
+interface RestoreResult {
+  success: boolean;
+  restoredFrom: string;
+}
+
+/** Options for safeMigrate */
+interface SafeMigrateOptions {
+  /** Set to false to disable automatic backup for destructive migrations */
+  autoBackup?: boolean;
+}
+
+/** Result of safeMigrate */
+interface SafeMigrateResult {
+  success: boolean;
+  error?: string;
+  analysis: MigrationAnalysis;
+  backup: BackupResult | null;
+}
+
 interface Keywords<T, K> {
   orderBy?: K | ((column: T, method: ComputeMethods) => void);
   desc?: boolean;
@@ -948,7 +996,11 @@ interface TypedDb<P, C, N> {
   rollback(): Promise<void>;
   pragma(sql: string): Promise<any[]>;
   deferForeignKeys(): Promise<void>;
-  migrate(sql: string): Promise<void>;
+  migrate(sql: string, options?: MigrateOptions): Promise<void | DryRunResult>;
+  backup(destPath: string): Promise<BackupResult>;
+  restore(sourcePath: string): Promise<RestoreResult>;
+  safetyBackup(): Promise<BackupResult>;
+  safeMigrate(sql: string, options?: SafeMigrateOptions): Promise<SafeMigrateResult>;
   getSchema(): any[];
   diff(schema?: any[]): string;
   batch<T extends any[]>(batcher: (bx: TypedDb<P, C, N> & P) => T): Promise<Unwrap<T>>;
@@ -1241,6 +1293,10 @@ export class SQLiteDatabase extends Database {
   getClient<T extends abstract new (...args: any[]) => any, C extends { [key: string]: T }>(classes: C): TypedDb<MakeClient<C>, MakeContext<C>, 'deferred' | 'immediate'> & MakeClient<C>;
   initialize(): Promise<void>;
   close(): Promise<void>;
+  backup(destPath: string): Promise<BackupResult>;
+  restore(sourcePath: string): Promise<RestoreResult>;
+  safetyBackup(): Promise<BackupResult>;
+  safeMigrate(sql: string, options?: SafeMigrateOptions): Promise<SafeMigrateResult>;
   created: boolean;
 }
 
@@ -1249,3 +1305,6 @@ export class TursoDatabase extends Database {
   getClient<T extends abstract new (...args: any[]) => any, C extends { [key: string]: T }>(classes: C): TypedDb<MakeClient<C>, MakeContext<C>, 'read' | 'write'> & MakeClient<C>;
   batch(handler: (batcher: any) => any[], type: 'read' | 'write'): Promise<any[]>;
 }
+
+/** Analyze migration SQL to detect potentially destructive operations */
+export function analyzeMigration(sql: string): MigrationAnalysis;
