@@ -1123,7 +1123,9 @@ const all = async (config) => {
     first,
     tx,
     subquery,
-    type
+    type,
+    withDeleted,
+    onlyDeleted
   } = config;
   const params = {};
   let query = config.query || {};
@@ -1160,10 +1162,24 @@ const all = async (config) => {
   }
   const tableClause = subquery ? `(${subquery.sql})` : table;
   sql += `${select.clause} from ${tableClause}`;
-  const clause = toWhere({
+  
+  // Build where clause
+  let clause = toWhere({
     query,
     params
   });
+  
+  // Apply soft delete filtering for tables with soft delete enabled
+  const hasSoftDelete = !subquery && db.softDeleteTables.has(table);
+  if (hasSoftDelete && !withDeleted) {
+    const softDeleteClause = onlyDeleted 
+      ? `${table}.deletedAt is not null`
+      : `${table}.deletedAt is null`;
+    clause = clause 
+      ? `(${clause}) and ${softDeleteClause}`
+      : softDeleteClause;
+  }
+  
   if (clause) {
     sql += ` where ${clause}`;
   }
