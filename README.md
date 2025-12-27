@@ -97,6 +97,34 @@ console.log(clouds);
 
 You probably want to use the migration system to create and modify tables though. See the [sample project](https://github.com/andrewitsover/midnight-tutorial) to get an idea of how a basic project can be setup.
 
+## Logging and query plans
+
+You can hook a logger to capture SQL, redacted params, duration, and errors. A simple example:
+
+```js
+const db = new SQLiteDatabase('forest.db');
+db.setLogger(event => {
+  console.log(`[${event.method}] ${event.sql} (${event.durationMs?.toFixed(2)} ms)`, event.params);
+}, {
+  maxStringLength: 120 // truncate long strings
+});
+
+// inspect the query plan for a statement or query expression
+const plan = await db.explain('select * from trees where id = $id', { id: 1 });
+```
+
+`explain` uses `EXPLAIN QUERY PLAN` under the hood. Params are redacted/truncated via `maxStringLength` or your own `redact(value)` function.
+
+## Validation (inserts and updates)
+
+Insert/upsert/update calls are validated against your table definitions:
+
+- `not null` columns must be provided unless they have defaults or are auto-increment integer primary keys.
+- Types must match: integers for `Integer`, strings for `Text`, booleans for `Bool`, Dates for `Date`, Buffers for `Blob`, and plain objects/arrays for `Json`.
+- Computed columns are ignored for validation.
+
+If a payload is missing a required column or a value has the wrong shape, the operation throws with a clear message (e.g., `Column forests.name must be a string`).
+
 ## The API
 
 Every table has ```get```, ```many```, ```first```, ```query```, ```update```, ```upsert```, ```insert```, ```insertMany```, and ```remove``` methods available to it, along with any of the custom methods that are created when you add a new SQL file to the corresponding table's folder.
