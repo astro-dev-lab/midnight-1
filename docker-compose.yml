@@ -1,0 +1,38 @@
+version: '3.9'
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: midnight
+      POSTGRES_PASSWORD: midnight
+      POSTGRES_DB: midnight
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U midnight -d midnight"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  signal:
+    build:
+      context: ./signal
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://midnight:midnight@db:5432/midnight?schema=public
+      JWT_SECRET: changeme-super-secret
+      CORS_ORIGINS: "*"
+      PORT: 3000
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+    driver: local

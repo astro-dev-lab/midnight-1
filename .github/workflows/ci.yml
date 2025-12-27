@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+
+      - name: Install root deps
+        run: npm ci
+
+      - name: Build Midnight library
+        run: npm run build
+
+      - name: Install Signal deps
+        working-directory: signal
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: signal
+        run: npx prisma generate
+
+      - name: Run tests (Signal)
+        working-directory: signal
+        env:
+          JWT_SECRET: test-secret
+        run: npm test -- --ci --reporters=default
