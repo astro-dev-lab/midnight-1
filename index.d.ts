@@ -551,6 +551,18 @@ interface Queries<T, E, W, Y> {
   sum<K extends keyof E>(query: AggregateQuery<W, K>): Promise<number>;
   exists(params: W | null): Promise<boolean>;
   groupBy<K extends keyof E>(columns: K | Array<K>): AggregateMethods<E, W, K, Y>;
+  /** Soft delete matching records (sets deletedAt to current timestamp). Only for SoftDeleteTable. */
+  softDelete(params?: W): Promise<number>;
+  /** Restore soft-deleted records (sets deletedAt back to null). Only for SoftDeleteTable. */
+  restore(params?: W): Promise<number>;
+  /** Get records including soft-deleted ones */
+  withDeleted(params?: W): Promise<Array<T>>;
+  withDeleted<K extends keyof E>(params: W | null, columns: (keyof E)[] | K[]): Promise<Array<Pick<E, K>>>;
+  withDeleted<K extends keyof E>(params: W | null, column: K): Promise<Array<E[K]>>;
+  /** Get only soft-deleted records */
+  onlyDeleted(params?: W): Promise<Array<T>>;
+  onlyDeleted<K extends keyof E>(params: W | null, columns: (keyof E)[] | K[]): Promise<Array<Pick<E, K>>>;
+  onlyDeleted<K extends keyof E>(params: W | null, column: K): Promise<Array<E[K]>>;
 }
 
 type CompareMethods<T> = {

@@ -475,6 +475,40 @@ const result = await db.safeMigrate(sql);
 await db.safeMigrate(sql, { autoBackup: false });
 ```
 
+## Soft deletes
+
+Tables that extend `SoftDeleteTable` instead of `Table` get automatic soft delete support:
+
+```js
+import { SoftDeleteTable } from '@andrewitsover/midnight';
+
+class Posts extends SoftDeleteTable {
+  title;
+  body;
+}
+```
+
+This adds a nullable `deletedAt` column. Queries automatically filter deleted records:
+
+```js
+// Soft delete instead of hard delete
+await db.posts.softDelete({ id: 1 });
+
+// Normal queries exclude deleted records
+const posts = await db.posts.many();  // Only non-deleted posts
+
+// Include deleted records
+const all = await db.posts.withDeleted();
+
+// Only deleted records
+const trash = await db.posts.onlyDeleted();
+
+// Restore soft-deleted records
+await db.posts.restore({ id: 1 });
+```
+
+Aggregates like `count()`, `exists()`, etc. also respect soft delete filtering.
+
 ## Creating tables
 
 In addition to the built-in SQLite types of ```Integer```, ```Real```, ```Text```, and ```Blob```, Midnight adds a few extra types. ```Boolean``` is stored in the database as a 1 or a 0, ```Date``` is stored as an ISO8601 string, and ```Json``` is a JSONB blob.

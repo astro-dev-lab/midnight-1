@@ -559,11 +559,13 @@ const exists = async (config) => {
     table,
     tx,
     subquery,
-    groupKeys
+    groupKeys,
+    withDeleted,
+    onlyDeleted
   } = config;
   const query = config.query || {};
   if (groupKeys && groupKeys.length > 0) {
-    const result = await aggregate({ db, table, query, tx, method: 'count', groupKeys });
+    const result = await aggregate({ db, table, query, tx, method: 'count', groupKeys, withDeleted, onlyDeleted });
     return result.map(r => {
       const adjusted = {
         result: r.countResult > 0
@@ -576,7 +578,22 @@ const exists = async (config) => {
   const params = {};
   const clause = subquery ? `(${subquery.sql})` : table;
   let sql = `select exists(select 1 from ${clause}`;
-  sql += addClauses(table, query, params);
+  
+  // Build where clause with soft delete filtering
+  let whereClause = toWhere(table, query, params);
+  const hasSoftDelete = !subquery && db.softDeleteTables.has(table);
+  if (hasSoftDelete && !withDeleted) {
+    const softDeleteClause = onlyDeleted 
+      ? `${table}.deletedAt is not null`
+      : `${table}.deletedAt is null`;
+    whereClause = whereClause 
+      ? `(${whereClause}) and ${softDeleteClause}`
+      : softDeleteClause;
+  }
+  if (whereClause) {
+    sql += ` where ${whereClause}`;
+  }
+  
   sql += ') as exists_result';
   const options = {
     query: sql,
@@ -757,7 +774,9 @@ const aggregate = async (config) => {
     tx,
     method,
     subquery,
-    groupKeys
+    groupKeys,
+    withDeleted,
+    onlyDeleted
   } = config;
   const params = {};
   const query = config.query || {};
@@ -781,10 +800,22 @@ const aggregate = async (config) => {
   if (groupKeys && groupKeys.length > 0) {
     groupFields = groupKeys.map(c => nameToSql(c)).join(', ');
   }
-  const whereClause = toWhere({
+  let whereClause = toWhere({
     query: where,
     params
   });
+  
+  // Apply soft delete filtering for tables with soft delete enabled
+  const hasSoftDelete = !subquery && db.softDeleteTables.has(table);
+  if (hasSoftDelete && !withDeleted) {
+    const softDeleteClause = onlyDeleted 
+      ? `${table}.deletedAt is not null`
+      : `${table}.deletedAt is null`;
+    whereClause = whereClause 
+      ? `(${whereClause}) and ${softDeleteClause}`
+      : softDeleteClause;
+  }
+  
   const groupClause = groupFields ? `, ${groupFields}` : '';
   const tableClause = subquery ? `(${subquery.sql})` : table;
   sql = `select ${expression}${groupClause} from ${tableClause}`;
