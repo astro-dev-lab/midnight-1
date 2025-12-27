@@ -821,6 +821,7 @@ export {
   Trigram,
   Ascii,
   Table,
+  SoftDeleteTable,
   toSql,
   toHash,
   process,
