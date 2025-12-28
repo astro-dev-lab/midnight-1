@@ -118,6 +118,46 @@ type BeforeHookFn<T = any> = (data: T, context: HookContext) => T | undefined | 
  */
 type AfterHookFn<T = any, R = any> = (result: R, data: T, context: HookContext) => void | Promise<void>;
 
+/** Query statistics */
+interface QueryStats {
+  total: number;
+  reads: number;
+  writes: number;
+  errors: number;
+  avgDurationMs: number;
+  slowQueries: number;
+  slowThresholdMs: number;
+}
+
+/** Transaction statistics */
+interface TransactionStats {
+  active: number;
+}
+
+/** Writer lock statistics */
+interface WriterLockStats {
+  totalWaits: number;
+  avgWaitMs: number;
+}
+
+/** Comprehensive database statistics */
+interface DatabaseStats {
+  queries: QueryStats;
+  transactions: TransactionStats;
+  writerLock: WriterLockStats;
+  cache: CacheStats;
+}
+
+/** Cache statistics */
+interface CacheStats {
+  hits: number;
+  misses: number;
+  invalidations: number;
+  size: number;
+  enabled: boolean;
+  hitRate: string;
+}
+
 interface Keywords<T, K> {
   orderBy?: K | ((column: T, method: ComputeMethods) => void);
   desc?: boolean;
@@ -1415,6 +1455,12 @@ export class Database {
   removeHook(table: string, hookName: HookName, fn: BeforeHookFn | AfterHookFn): boolean;
   /** Clear all hooks for a table, or all hooks if no table specified */
   clearHooks(table?: string): void;
+  /** Get comprehensive database statistics */
+  getStats(): DatabaseStats;
+  /** Reset all query and cache statistics */
+  resetStats(): void;
+  /** Set the threshold for slow query detection (in milliseconds) */
+  setSlowQueryThreshold(ms: number): void;
 }
 
 export class SQLiteDatabase extends Database {

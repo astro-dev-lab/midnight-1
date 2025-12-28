@@ -202,6 +202,10 @@ const makeClient = (db, tx) => {
       if (['addHook', 'removeHook', 'clearHooks'].includes(table)) {
         return (...args) => db[table](...args);
       }
+      // Stats methods
+      if (['getStats', 'resetStats', 'setSlowQueryThreshold'].includes(table)) {
+        return (...args) => db[table](...args);
+      }
       if (table === 'use') {
         return (subquery) => {
           return new Proxy({}, makeQueryHandler({ 

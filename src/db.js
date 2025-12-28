@@ -45,6 +45,20 @@ class Database {
     // Lifecycle hooks: { tableName: { hookName: [fn, fn, ...] } }
     this.hooks = {};
     
+    // Query statistics
+    this.queryStats = {
+      totalQueries: 0,
+      totalReads: 0,
+      totalWrites: 0,
+      totalErrors: 0,
+      totalDurationMs: 0,
+      slowQueries: 0,
+      slowQueryThresholdMs: 100, // queries taking longer than this are "slow"
+      activeTransactions: 0,
+      writerLockWaits: 0,
+      writerLockWaitTimeMs: 0
+    };
+    
     this.registerTypes([
       {
         name: 'boolean',
@@ -327,6 +341,93 @@ class Database {
    */
   resetCacheStats() {
     this.cacheStats = { hits: 0, misses: 0, invalidations: 0 };
+  }
+
+  // ---- Query Statistics ----
+
+  /**
+   * Record a query execution for stats
+   */
+  recordQueryStats(durationMs, isWrite, isError) {
+    this.queryStats.totalQueries++;
+    this.queryStats.totalDurationMs += durationMs;
+    if (isWrite) {
+      this.queryStats.totalWrites++;
+    } else {
+      this.queryStats.totalReads++;
+    }
+    if (isError) {
+      this.queryStats.totalErrors++;
+    }
+    if (durationMs > this.queryStats.slowQueryThresholdMs) {
+      this.queryStats.slowQueries++;
+    }
+  }
+
+  /**
+   * Record writer lock wait time
+   */
+  recordWriterWait(waitTimeMs) {
+    this.queryStats.writerLockWaits++;
+    this.queryStats.writerLockWaitTimeMs += waitTimeMs;
+  }
+
+  /**
+   * Get comprehensive database statistics
+   */
+  getStats() {
+    const avgQueryTime = this.queryStats.totalQueries > 0
+      ? (this.queryStats.totalDurationMs / this.queryStats.totalQueries).toFixed(2)
+      : 0;
+    const avgWriterWait = this.queryStats.writerLockWaits > 0
+      ? (this.queryStats.writerLockWaitTimeMs / this.queryStats.writerLockWaits).toFixed(2)
+      : 0;
+
+    return {
+      queries: {
+        total: this.queryStats.totalQueries,
+        reads: this.queryStats.totalReads,
+        writes: this.queryStats.totalWrites,
+        errors: this.queryStats.totalErrors,
+        avgDurationMs: parseFloat(avgQueryTime),
+        slowQueries: this.queryStats.slowQueries,
+        slowThresholdMs: this.queryStats.slowQueryThresholdMs
+      },
+      transactions: {
+        active: this.queryStats.activeTransactions
+      },
+      writerLock: {
+        totalWaits: this.queryStats.writerLockWaits,
+        avgWaitMs: parseFloat(avgWriterWait)
+      },
+      cache: this.getCacheStats()
+    };
+  }
+
+  /**
+   * Reset all query statistics
+   */
+  resetStats() {
+    this.queryStats = {
+      totalQueries: 0,
+      totalReads: 0,
+      totalWrites: 0,
+      totalErrors: 0,
+      totalDurationMs: 0,
+      slowQueries: 0,
+      slowQueryThresholdMs: this.queryStats.slowQueryThresholdMs,
+      activeTransactions: 0,
+      writerLockWaits: 0,
+      writerLockWaitTimeMs: 0
+    };
+    this.resetCacheStats();
+  }
+
+  /**
+   * Set the slow query threshold
+   */
+  setSlowQueryThreshold(ms) {
+    this.queryStats.slowQueryThresholdMs = ms;
   }
 
   // ---- Lifecycle Hooks ----

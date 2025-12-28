@@ -23,13 +23,20 @@ class SQLiteDatabase extends Database {
 
   async getWriter() {
     let lock;
+    const waitStart = this.now();
+    let waited = false;
     while (true) {
       if (!this.writer) {
         lock = Promise.withResolvers();
         this.writer = lock.promise;
         break;
       }
+      waited = true;
       await this.writer;
+    }
+    if (waited) {
+      const waitTime = this.elapsed(waitStart);
+      this.recordWriterWait(waitTime);
     }
     return lock;
   }
@@ -214,6 +221,7 @@ class SQLiteDatabase extends Database {
     const tx = { db: this.write, writer };
     const sql = type ? `begin ${type}` : 'begin';
     await this.basicRun(sql, tx);
+    this.queryStats.activeTransactions++;
     return makeClient(this, tx);
   }
 
@@ -221,12 +229,14 @@ class SQLiteDatabase extends Database {
     await this.basicRun('commit', tx);
     this.writer = null;
     tx.writer.resolve();
+    this.queryStats.activeTransactions = Math.max(0, this.queryStats.activeTransactions - 1);
   }
 
   async rollback(tx) {
     await this.basicRun('rollback', tx);
     this.writer = null;
     tx.writer.resolve();
+    this.queryStats.activeTransactions = Math.max(0, this.queryStats.activeTransactions - 1);
   }
 
   async getError(sql) {
@@ -348,10 +358,13 @@ class SQLiteDatabase extends Database {
       // Invalidate cache for affected tables
       this.invalidateCache(this.extractTablesFromSql(sqlText));
       
+      const duration = this.elapsed(start);
+      this.recordQueryStats(duration, true, false);
+      
       this.logQuery({
         sql: sqlText,
         params,
-        durationMs: this.elapsed(start),
+        durationMs: duration,
         method: op,
         tx: Boolean(tx),
         write: true
@@ -363,10 +376,13 @@ class SQLiteDatabase extends Database {
         this.writer = null;
         lock.resolve();
       }
+      const duration = this.elapsed(start);
+      this.recordQueryStats(duration, true, true);
+      
       this.logQuery({
         sql: sqlText,
         params,
-        durationMs: this.elapsed(start),
+        durationMs: duration,
         method: op,
         tx: Boolean(tx),
         write: true,
@@ -455,10 +471,13 @@ class SQLiteDatabase extends Database {
         this.setCached(sqlText, params, result);
       }
       
+      const duration = this.elapsed(start);
+      this.recordQueryStats(duration, Boolean(write), false);
+      
       this.logQuery({
         sql: sqlText,
         params,
-        durationMs: this.elapsed(start),
+        durationMs: duration,
         method: op,
         tx: Boolean(tx),
         write: Boolean(write)
@@ -470,10 +489,13 @@ class SQLiteDatabase extends Database {
         this.writer = null;
         lock.resolve();
       }
+      const duration = this.elapsed(start);
+      this.recordQueryStats(duration, Boolean(write), true);
+      
       this.logQuery({
         sql: sqlText,
         params,
-        durationMs: this.elapsed(start),
+        durationMs: duration,
         method: op,
         tx: Boolean(tx),
         write: Boolean(write),
