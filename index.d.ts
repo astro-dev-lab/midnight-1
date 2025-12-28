@@ -48,6 +48,49 @@ interface SafeMigrateResult {
   backup: BackupResult | null;
 }
 
+/** Result of offset-based pagination */
+interface PaginateResult<T> {
+  data: T[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasMore: boolean;
+}
+
+/** Result of cursor-based pagination */
+interface CursorPaginateResult<T, C = number> {
+  data: T[];
+  nextCursor: C | null;
+  hasMore: boolean;
+}
+
+/** Options for offset-based pagination */
+interface PaginateQuery<W, K, T> {
+  where?: W;
+  select?: (keyof T)[] | K[];
+  return?: K;
+  omit?: K | K[];
+  page?: number;
+  pageSize?: number;
+  orderBy?: K | K[] | ((column: T, method: ComputeMethods) => void);
+  desc?: boolean;
+}
+
+/** Options for cursor-based pagination */
+interface CursorPaginateQuery<W, K, T> {
+  where?: W;
+  select?: (keyof T)[] | K[];
+  return?: K;
+  omit?: K | K[];
+  cursor?: any;
+  limit?: number;
+  cursorColumn?: K;
+  direction?: 'after' | 'before';
+  orderBy?: K | K[] | ((column: T, method: ComputeMethods) => void);
+  desc?: boolean;
+}
+
 interface Keywords<T, K> {
   orderBy?: K | ((column: T, method: ComputeMethods) => void);
   desc?: boolean;
@@ -563,6 +606,12 @@ interface Queries<T, E, W, Y> {
   onlyDeleted(params?: W): Promise<Array<T>>;
   onlyDeleted<K extends keyof E>(params: W | null, columns: (keyof E)[] | K[]): Promise<Array<Pick<E, K>>>;
   onlyDeleted<K extends keyof E>(params: W | null, column: K): Promise<Array<E[K]>>;
+  /** Offset-based pagination with total count and page info */
+  paginate<K extends keyof E>(query?: PaginateQuery<W, K, T>): Promise<PaginateResult<T>>;
+  paginate<K extends keyof E>(query: PaginateQuery<W, K, T> & { select: (keyof T)[] | K[] }): Promise<PaginateResult<Pick<E, K>>>;
+  /** Cursor-based pagination for efficient infinite scroll */
+  cursorPaginate<K extends keyof E>(query?: CursorPaginateQuery<W, K, T>): Promise<CursorPaginateResult<T>>;
+  cursorPaginate<K extends keyof E>(query: CursorPaginateQuery<W, K, T> & { select: (keyof T)[] | K[] }): Promise<CursorPaginateResult<Pick<E, K>>>;
 }
 
 type CompareMethods<T> = {

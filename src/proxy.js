@@ -10,7 +10,9 @@ import {
   all,
   remove,
   softDelete,
-  restore
+  restore,
+  paginate,
+  cursorPaginate
 } from './queries.js';
 
 const groupMethods = (args) => {
@@ -46,7 +48,9 @@ const basic = {
   softDelete: (args) => async (query) => await softDelete({ query, ...args }),
   restore: (args) => async (query) => await restore({ query, ...args }),
   withDeleted: (args) => async (query, columns, config) => await all({ query, columns, withDeleted: true, ...config, ...args }),
-  onlyDeleted: (args) => async (query, columns, config) => await all({ query, columns, onlyDeleted: true, ...config, ...args })
+  onlyDeleted: (args) => async (query, columns, config) => await all({ query, columns, onlyDeleted: true, ...config, ...args }),
+  paginate: (args) => async (query, config) => await paginate({ query, ...config, ...args }),
+  cursorPaginate: (args) => async (query, config) => await cursorPaginate({ query, ...config, ...args })
 }
 
 const getConverters = (key, value, db, converters, keys = [], optional = []) => {

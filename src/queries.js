@@ -1381,6 +1381,155 @@ const restore = async (args) => {
   return await db.run(options);
 }
 
+/**
+ * Offset-based pagination
+ * Returns { data, page, pageSize, totalCount, totalPages, hasMore }
+ */
+const paginate = async (config) => {
+  const {
+    db,
+    table,
+    tx,
+    withDeleted,
+    onlyDeleted
+  } = config;
+  const query = config.query || {};
+  const { where, select, return: returning, omit, page = 1, pageSize = 20, ...keywords } = query;
+  
+  // Validate pagination params
+  const currentPage = Math.max(1, parseInt(page, 10) || 1);
+  const limit = Math.max(1, Math.min(1000, parseInt(pageSize, 10) || 20));
+  const offset = (currentPage - 1) * limit;
+  
+  // Get total count - aggregate expects { where: ... } format
+  const countResult = await aggregate({
+    db,
+    table,
+    query: { where },
+    tx,
+    method: 'count',
+    withDeleted,
+    onlyDeleted
+  });
+  const totalCount = countResult || 0;
+  const totalPages = Math.ceil(totalCount / limit);
+  
+  // Get paginated data
+  const paginatedQuery = {
+    where,
+    select,
+    return: returning,
+    omit,
+    limit,
+    offset,
+    ...keywords
+  };
+  
+  const data = await all({
+    db,
+    table,
+    query: paginatedQuery,
+    tx,
+    type: 'complex',
+    withDeleted,
+    onlyDeleted
+  });
+  
+  return {
+    data,
+    page: currentPage,
+    pageSize: limit,
+    totalCount,
+    totalPages,
+    hasMore: currentPage < totalPages
+  };
+}
+
+/**
+ * Cursor-based pagination
+ * Returns { data, nextCursor, hasMore }
+ */
+const cursorPaginate = async (config) => {
+  const {
+    db,
+    table,
+    tx,
+    withDeleted,
+    onlyDeleted
+  } = config;
+  const query = config.query || {};
+  const { 
+    where = {}, 
+    select, 
+    return: returning, 
+    omit, 
+    cursor, 
+    limit: requestedLimit = 20,
+    cursorColumn = 'id',
+    direction = 'after',
+    ...keywords 
+  } = query;
+  
+  // Validate params
+  const limit = Math.max(1, Math.min(1000, parseInt(requestedLimit, 10) || 20));
+  verify(cursorColumn);
+  
+  // Build cursor condition
+  let cursorWhere = { ...where };
+  if (cursor !== undefined && cursor !== null) {
+    const op = direction === 'before' ? 'lt' : 'gt';
+    cursorWhere[cursorColumn] = (c) => c[op](cursor);
+  }
+  
+  // Determine order direction
+  const orderDir = direction === 'before' ? 'desc' : 'asc';
+  const orderBy = keywords.orderBy || cursorColumn;
+  const desc = direction === 'before' ? !keywords.desc : keywords.desc;
+  
+  // Fetch one extra to determine hasMore
+  const paginatedQuery = {
+    where: cursorWhere,
+    select,
+    return: returning,
+    omit,
+    limit: limit + 1,
+    orderBy,
+    desc,
+    ...keywords
+  };
+  
+  const results = await all({
+    db,
+    table,
+    query: paginatedQuery,
+    tx,
+    type: 'complex',
+    withDeleted,
+    onlyDeleted
+  });
+  
+  const hasMore = results.length > limit;
+  const data = hasMore ? results.slice(0, limit) : results;
+  
+  // Reverse if fetching before (since we fetched in reverse order)
+  if (direction === 'before') {
+    data.reverse();
+  }
+  
+  // Compute next cursor
+  let nextCursor = null;
+  if (hasMore && data.length > 0) {
+    const lastItem = data[data.length - 1];
+    nextCursor = lastItem[cursorColumn];
+  }
+  
+  return {
+    data,
+    nextCursor,
+    hasMore
+  };
+}
+
 export {
   insert,
   insertMany,
@@ -1393,5 +1542,7 @@ export {
   all,
   remove,
   softDelete,
-  restore
+  restore,
+  paginate,
+  cursorPaginate
 }

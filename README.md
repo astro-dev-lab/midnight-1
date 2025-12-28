@@ -307,6 +307,51 @@ const wolves = await db.animals.query({
 
 You should only include one condition per object.
 
+### Pagination
+
+Midnight provides two pagination methods for large datasets:
+
+#### Offset-based pagination
+
+Use `paginate` for traditional page-based navigation with total counts:
+
+```js
+const result = await db.posts.paginate({
+  where: { published: true },
+  page: 2,
+  pageSize: 10,
+  orderBy: 'createdAt',
+  desc: true
+});
+// Returns: { data, page, pageSize, totalCount, totalPages, hasMore }
+```
+
+#### Cursor-based pagination
+
+Use `cursorPaginate` for efficient infinite scroll or "load more" patterns:
+
+```js
+// First page
+const page1 = await db.posts.cursorPaginate({ limit: 20 });
+
+// Next page using cursor
+const page2 = await db.posts.cursorPaginate({
+  cursor: page1.nextCursor,
+  limit: 20
+});
+// Returns: { data, nextCursor, hasMore }
+```
+
+You can use a custom cursor column:
+
+```js
+const result = await db.posts.cursorPaginate({
+  cursorColumn: 'createdAt',
+  orderBy: 'createdAt',
+  limit: 20
+});
+```
+
 ### Aggregate functions
 
 There are multiple functions that aggregate the results into a single value. These include ```count```, ```avg```, ```min```, ```max```, and ```sum```. Despite its name, ```sum``` uses the SQLite function ```total``` to determine the results.
