@@ -10,6 +10,7 @@ const makeProxy = (options) => {
   } = options;
   const existing = Object.keys(db.columns);
   const usedAliases = new Set(existing);
+  const tableHandlers = new Map(); // Cache table handlers to ensure consistent aliases
   const makeAlias = (table) => {
     const letter = table ? table[0].toLowerCase() : 's';
     for (let i = 0; i < 100; i++) {
@@ -22,6 +23,10 @@ const makeProxy = (options) => {
     throw Error('Failed to create a unique table alias');
   }
   const makeTableHandler = (table) => {
+    // Return cached handler if already created for this table
+    if (tableHandlers.has(table)) {
+      return tableHandlers.get(table);
+    }
     const tableAlias = makeAlias(table);
     const keys = Object.keys(db.columns[table]);
     const handler = {
@@ -62,6 +67,7 @@ const makeProxy = (options) => {
     };
     const proxy = new Proxy({}, handler);
     requests.set(proxy, { isProxy: true });
+    tableHandlers.set(table, proxy); // Cache the handler for reuse
     return proxy;
   }
   const handler = {

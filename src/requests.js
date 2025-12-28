@@ -460,18 +460,27 @@ const processMethod = (options) => {
       };
     }
     else if (['min', 'max', 'avg', 'sum', 'count'].includes(name)) {
-      const { column, distinct } = arg;
+      const { column, distinct } = arg || {};
       const field = column || distinct;
-      const bodyArg = processArg({
-        db,
-        arg: field,
-        params,
-        requests
-      });
-      if (['min', 'max'].includes(name)) {
-        type = bodyArg.type;
+      if (field) {
+        const bodyArg = processArg({
+          db,
+          arg: field,
+          params,
+          requests
+        });
+        if (['min', 'max'].includes(name)) {
+          type = bodyArg.type;
+        }
+        sql = `${name}(${distinct ? 'distinct ' : ''}${bodyArg.sql})`;
       }
-      sql = `${name}(${distinct ? 'distinct ' : ''}${bodyArg.sql})`;
+      else if (name === 'count') {
+        // count() with only window options (partitionBy, orderBy, etc.)
+        sql = 'count(*)';
+      }
+      else {
+        throw Error(`Aggregate "${name}" requires a column`);
+      }
     }
     else {
       sql = `${name}()`;
