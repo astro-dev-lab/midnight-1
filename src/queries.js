@@ -252,7 +252,7 @@ const processBatch = async (db, options, post) => {
   }
 }
 
-const processInsert = async (db, sql, params, primaryKey, tx) => {
+const processInsert = async (db, sql, params, primaryKey, tx, allowEmpty = false) => {
   const options = {
     query: sql,
     params,
@@ -260,7 +260,12 @@ const processInsert = async (db, sql, params, primaryKey, tx) => {
     write: true,
     adjusted: true
   };
-  const post = (result) => result[0][primaryKey];
+  const post = (result) => {
+    if (allowEmpty && (!result || result.length === 0)) {
+      return undefined;
+    }
+    return result[0][primaryKey];
+  };
   if (tx && tx.isBatch) {
     return await processBatch(db, options, post);
   }
@@ -297,6 +302,7 @@ const upsert = async (args) => {
   const query = adjust(db, table, processedValues);
   let sql = makeInsertSql(db, table, query, params);
   verify(Object.keys(processedValues));
+  let allowEmpty = false;
   if (target && set) {
     verify([target]);
     verify(Object.keys(set));
@@ -306,10 +312,11 @@ const upsert = async (args) => {
   }
   else {
     sql += ' on conflict do nothing';
+    allowEmpty = true; // No row returned when conflict triggers do nothing
   }
   const primaryKey = db.getPrimaryKey(table);
   sql += ` returning ${primaryKey}`;
-  const result = await processInsert(db, sql, params, primaryKey, tx);
+  const result = await processInsert(db, sql, params, primaryKey, tx, allowEmpty);
   
   // Run afterUpsert hooks
   await db.runAfterHooks(table, 'afterUpsert', result, processedValues, { tx, target, set });
@@ -607,7 +614,7 @@ const exists = async (config) => {
   let sql = `select exists(select 1 from ${clause}`;
   
   // Build where clause with soft delete filtering
-  let whereClause = toWhere(table, query, params);
+  let whereClause = toWhere({ query, params });
   const hasSoftDelete = !subquery && db.softDeleteTables.has(table);
   if (hasSoftDelete && !withDeleted) {
     const softDeleteClause = onlyDeleted 
