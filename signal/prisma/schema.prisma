@@ -7,21 +7,326 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  ADMIN
-  USER
+// =============================================================================
+// ENUMS - StudioOS Canonical States & Roles
+// =============================================================================
+
+// Internal roles (Dashboard One)
+enum InternalRole {
+  BASIC
+  STANDARD
+  ADVANCED
 }
+
+// External roles (Dashboard Two - Client Portal)
+enum ExternalRole {
+  VIEWER
+  APPROVER
+}
+
+// Project states: Draft → Processing → Ready → Delivered
+enum ProjectState {
+  DRAFT
+  PROCESSING
+  READY
+  DELIVERED
+}
+
+// Asset categories: Raw → Derived → Final
+enum AssetCategory {
+  RAW
+  DERIVED
+  FINAL
+}
+
+// Job states: Queued → Running → Completed | Failed
+enum JobState {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+// Report types (closed set per STUDIOOS_TRANSPARENCY_CHARTER.md)
+enum ReportType {
+  ANALYSIS
+  MIXING
+  EDITING
+  MASTERING
+  CONVERSION
+  DELIVERY
+}
+
+// Error categories (closed set per STUDIOOS_ERROR_RECOVERY_PLAYBOOK.md)
+enum ErrorCategory {
+  INGESTION
+  PROCESSING
+  OUTPUT
+  DELIVERY
+  SYSTEM
+}
+
+// =============================================================================
+// USERS - Internal and External
+// =============================================================================
+
+model User {
+  id           Int           @id @default(autoincrement())
+  email        String        @unique
+  passwordHash String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  
+  // Role assignment - one of internal OR external
+  internalRole InternalRole?
+  externalRole ExternalRole?
+  
+  // Relations
+  projects     Project[]     @relation("ProjectOwner")
+  jobs         Job[]         @relation("JobCreator")
+  approvals    Approval[]
+  comments     Comment[]
+  
+  // External user project access
+  sharedProjects ProjectAccess[]
+}
+
+// =============================================================================
+// PROJECTS
+// =============================================================================
+
+model Project {
+  id          Int          @id @default(autoincrement())
+  name        String
+  state       ProjectState @default(DRAFT)
+  
+  // Audit timestamps
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  
+  // Owner
+  ownerId     Int
+  owner       User         @relation("ProjectOwner", fields: [ownerId], references: [id])
+  
+  // Relations
+  assets      Asset[]
+  jobs        Job[]
+  deliveries  Delivery[]
+  
+  // External access
+  sharedWith  ProjectAccess[]
+}
+
+// External user access to projects
+model ProjectAccess {
+  id        Int      @id @default(autoincrement())
+  projectId Int
+  userId    Int
+  createdAt DateTime @default(now())
+  
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([projectId, userId])
+}
+
+// =============================================================================
+// ASSETS - Immutable with lineage tracking
+// =============================================================================
+
+model Asset {
+  id          Int           @id @default(autoincrement())
+  name        String
+  category    AssetCategory @default(RAW)
+  
+  // File reference (path or external storage key)
+  fileKey     String
+  mimeType    String
+  sizeBytes   BigInt
+  
+  // Lineage - tracks derivation chain
+  parentId    Int?
+  parent      Asset?        @relation("AssetLineage", fields: [parentId], references: [id])
+  derivatives Asset[]       @relation("AssetLineage")
+  
+  // Metadata (JSON blob for flexible tagging)
+  metadata    Json?
+  
+  // Audit timestamps
+  createdAt   DateTime      @default(now())
+  
+  // Project relation
+  projectId   Int
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  // Jobs that use this as input
+  inputToJobs  JobInput[]
+  
+  // Jobs that produced this as output
+  outputFromJob Job?        @relation("JobOutput", fields: [outputJobId], references: [id])
+  outputJobId   Int?
+  
+  // Approvals and deliverables
+  approvals   Approval[]
+  deliveries  DeliveryAsset[]
+}
+
+// =============================================================================
+// JOBS - Asynchronous, deterministic, immutable once submitted
+// =============================================================================
+
+model Job {
+  id          Int        @id @default(autoincrement())
+  state       JobState   @default(QUEUED)
+  
+  // Job type/preset reference
+  preset      String
+  parameters  Json?
+  
+  // Audit timestamps
+  createdAt   DateTime   @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  
+  // Creator
+  createdById Int
+  createdBy   User       @relation("JobCreator", fields: [createdById], references: [id])
+  
+  // Project relation
+  projectId   Int
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  // Input assets (many-to-many)
+  inputs      JobInput[]
+  
+  // Output assets (one-to-many)
+  outputs     Asset[]    @relation("JobOutput")
+  
+  // Processing report (required on completion)
+  report      Report?
+  
+  // Error tracking (if failed)
+  errorCategory ErrorCategory?
+  errorMessage  String?
+}
+
+// Many-to-many: Jobs have multiple input assets
+model JobInput {
+  id       Int   @id @default(autoincrement())
+  jobId    Int
+  assetId  Int
+  
+  job      Job   @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  asset    Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  
+  @@unique([jobId, assetId])
+}
+
+// =============================================================================
+// REPORTS - Transparency layer (per STUDIOOS_TRANSPARENCY_CHARTER.md)
+// =============================================================================
+
+model Report {
+  id              Int        @id @default(autoincrement())
+  type            ReportType
+  
+  // Required sections
+  summary         String     // Job type, timestamps, asset refs, preset
+  changesApplied  String     // Human-readable list of system actions
+  rationale       String     // Why changes were applied
+  impactAssessment String    // Qualitative effect description
+  confidence      String     // Low | Medium | High
+  
+  // Optional
+  limitations     String?    // Constraints, trade-offs, known limitations
+  
+  // Audit
+  createdAt       DateTime   @default(now())
+  
+  // One-to-one with Job
+  jobId           Int        @unique
+  job             Job        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
+
+// =============================================================================
+// APPROVALS - Review & decision tracking
+// =============================================================================
+
+model Approval {
+  id          Int      @id @default(autoincrement())
+  approved    Boolean
+  comment     String?
+  
+  // Audit
+  createdAt   DateTime @default(now())
+  
+  // Who approved
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  
+  // What was approved
+  assetId     Int
+  asset       Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  
+  @@index([assetId])
+}
+
+// =============================================================================
+// COMMENTS - Non-binding feedback
+// =============================================================================
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  content   String
+  createdAt DateTime @default(now())
+  
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  
+  // Polymorphic: can be on asset or job (use one)
+  assetId   Int?
+  jobId     Int?
+  
+  @@index([assetId])
+  @@index([jobId])
+}
+
+// =============================================================================
+// DELIVERIES - Final output tracking
+// =============================================================================
+
+model Delivery {
+  id          Int             @id @default(autoincrement())
+  destination String          // Platform, path, or integration key
+  status      String          // pending | completed | failed
+  
+  // Audit
+  createdAt   DateTime        @default(now())
+  completedAt DateTime?
+  
+  projectId   Int
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  assets      DeliveryAsset[]
+}
+
+model DeliveryAsset {
+  id         Int      @id @default(autoincrement())
+  deliveryId Int
+  assetId    Int
+  
+  delivery   Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  asset      Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  
+  @@unique([deliveryId, assetId])
+}
+
+// =============================================================================
+// LEGACY - Keep for backward compatibility during migration
+// =============================================================================
 
 model Ping {
   id        Int      @id @default(autoincrement())
   message   String   @default("ok")
   createdAt DateTime @default(now())
-}
-
-model User {
-  id           Int      @id @default(autoincrement())
-  email        String   @unique
-  passwordHash String
-  createdAt    DateTime @default(now())
-  role         Role     @default(USER)
 }

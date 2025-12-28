@@ -1,0 +1,327 @@
+/**
+ * AudioComparison Component Styles
+ */
+
+.audio-comparison {
+  background: #1a1a1a;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+}
+
+.audio-comparison h4 {
+  margin: 0 0 1rem 0;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.audio-comparison.empty {
+  text-align: center;
+  color: #666;
+}
+
+/* Comparison Grid */
+.comparison-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.comparison-panel {
+  background: #252525;
+  border-radius: 6px;
+  padding: 1rem;
+}
+
+.comparison-panel h5 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.875rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.input-panel h5 {
+  color: #f87171;
+}
+
+.output-panel h5 {
+  color: #4ade80;
+}
+
+.comparison-panel .asset-name {
+  margin: 0 0 0.75rem 0;
+  color: #e0e0e0;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comparison-panel .no-asset {
+  color: #555;
+  font-style: italic;
+}
+
+/* Volume Control */
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.75rem;
+  color: #888;
+}
+
+.volume-control input[type="range"] {
+  flex: 1;
+  height: 4px;
+  background: #3a3a3a;
+  border-radius: 2px;
+  cursor: pointer;
+  -webkit-appearance: none;
+}
+
+.volume-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #e0e0e0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+/* Play Buttons */
+.play-btn {
+  width: 100%;
+  padding: 0.625rem;
+  background: #3a3a3a;
+  color: #e0e0e0;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.play-btn:hover {
+  background: #4a4a4a;
+}
+
+.play-btn.active {
+  background: #4ade80;
+  color: #000;
+}
+
+.input-panel .play-btn.active {
+  background: #f87171;
+  color: #fff;
+}
+
+/* Synced Controls */
+.synced-controls {
+  border-top: 1px solid #2a2a2a;
+  padding-top: 1rem;
+  margin-top: 1rem;
+}
+
+.sync-play-btn {
+  width: 100%;
+  padding: 0.75rem;
+  background: #3a3a5a;
+  color: #a78bfa;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  margin-bottom: 1rem;
+}
+
+.sync-play-btn:hover {
+  background: #4a4a6a;
+}
+
+.sync-play-btn.active {
+  background: #a78bfa;
+  color: #000;
+}
+
+/* Timeline */
+.timeline {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.time-current,
+.time-total {
+  font-size: 0.75rem;
+  color: #888;
+  font-family: monospace;
+  min-width: 40px;
+}
+
+.time-current {
+  text-align: right;
+}
+
+.timeline-slider {
+  flex: 1;
+  height: 6px;
+  background: #3a3a3a;
+  border-radius: 3px;
+  cursor: pointer;
+  -webkit-appearance: none;
+}
+
+.timeline-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  background: #a78bfa;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.timeline-slider::-webkit-slider-runnable-track {
+  background: linear-gradient(to right, #a78bfa 0%, #a78bfa var(--progress, 0%), #3a3a3a var(--progress, 0%), #3a3a3a 100%);
+}
+
+/* Hint */
+.comparison-hint {
+  margin: 1rem 0 0 0;
+  font-size: 0.75rem;
+  color: #555;
+  text-align: center;
+}
+
+/* Confidence Indicator (shared) */
+.confidence-indicator {
+  margin: 1rem 0;
+}
+
+.confidence-gauge {
+  height: 8px;
+  background: #2a2a2a;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.confidence-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.confidence-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.confidence-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.confidence-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.confidence-explanation {
+  font-size: 0.75rem;
+  color: #888;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.confidence-section {
+  background: #252525;
+  border-radius: 6px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.confidence-section h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.875rem;
+  color: #888;
+}
+
+.report-summary {
+  font-size: 0.875rem;
+  color: #e0e0e0;
+  margin-top: 0.75rem;
+  line-height: 1.5;
+}
+
+/* Progress bar for history view */
+.progress-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.progress-bar {
+  height: 6px;
+  background: #2a2a2a;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #60a5fa;
+  transition: width 0.3s ease;
+}
+
+.progress-message {
+  font-size: 0.625rem;
+  color: #888;
+}
+
+/* History view SSE status */
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.history-header h2 {
+  margin: 0;
+}
+
+.connection-status {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+}
+
+.connection-status.connected {
+  background: #1e3a2a;
+  color: #4ade80;
+}
+
+.connection-status.disconnected {
+  background: #3a2a2a;
+  color: #888;
+}
+
+.table-row.active {
+  background: rgba(96, 165, 250, 0.1);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}

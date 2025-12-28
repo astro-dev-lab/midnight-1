@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api, Ping, CreatePingPayload } from '../api';
+import { api } from '../api';
+import type { Ping, CreatePingPayload } from '../api';
 import './Dashboard.css';
 
 interface DashboardProps {

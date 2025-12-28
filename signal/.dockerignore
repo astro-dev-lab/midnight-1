@@ -31,9 +31,8 @@ __tests__
 jest.config.js
 *.test.js
 
-# Documentation
+# Documentation (README only, keep docs/ for API)
 README.md
-docs
 
 # Package manager lock files (optional - remove if you want them in image for reproducible builds)
 # package-lock.json

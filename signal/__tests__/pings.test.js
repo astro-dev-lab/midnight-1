@@ -47,10 +47,10 @@ describe('Pings', () => {
   });
 
   test('delete ping requires admin', async () => {
-    const userToken = sign({ sub: 1, email: 'user@example.com', role: 'USER' });
+    const userToken = sign({ sub: 1, email: 'user@example.com', internalRole: 'BASIC' });
     await request(app).delete('/pings/1').set('Authorization', `Bearer ${userToken}`).expect(403);
 
-    const adminToken = sign({ sub: 1, email: 'admin@example.com', role: 'ADMIN' });
+    const adminToken = sign({ sub: 1, email: 'admin@example.com', internalRole: 'ADVANCED' });
     await request(app).delete('/pings/1').set('Authorization', `Bearer ${adminToken}`).expect(204);
   });
 });

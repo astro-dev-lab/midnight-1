@@ -3,7 +3,7 @@ import { api } from '../api';
 import './Auth.css';
 
 interface LoginProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (email: string, password: string) => Promise<void>;
 }
 
 export function Login({ onLoginSuccess }: LoginProps) {
@@ -19,10 +19,10 @@ export function Login({ onLoginSuccess }: LoginProps) {
     setLoading(true);
 
     try {
-      await api.login({ email, password });
-      onLoginSuccess();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed');
+      await onLoginSuccess(email, password);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Login failed';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -35,9 +35,11 @@ export function Login({ onLoginSuccess }: LoginProps) {
 
     try {
       await api.register({ email, password });
-      onLoginSuccess();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed');
+      // After registration, log in
+      await onLoginSuccess(email, password);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Registration failed';
+      setError(message);
     } finally {
       setLoading(false);
     }

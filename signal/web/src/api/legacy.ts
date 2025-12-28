@@ -1,4 +1,5 @@
-import axios, { AxiosInstance } from 'axios';
+import axios from 'axios';
+import type { AxiosInstance } from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -15,9 +16,10 @@ export interface LoginPayload {
 export interface AuthResponse {
   token: string;
   user: {
-    id: string;
+    id: number;
     email: string;
-    role: string;
+    internalRole?: 'BASIC' | 'STANDARD' | 'ADVANCED';
+    externalRole?: 'VIEWER' | 'APPROVER';
   };
 }
 
@@ -81,7 +83,12 @@ class ApiClient {
     return response.data;
   }
 
-  async login(payload: LoginPayload): Promise<AuthResponse> {
+  async login(payload: LoginPayload): Promise<AuthResponse>;
+  async login(email: string, password: string): Promise<AuthResponse>;
+  async login(emailOrPayload: string | LoginPayload, password?: string): Promise<AuthResponse> {
+    const payload = typeof emailOrPayload === 'string' 
+      ? { email: emailOrPayload, password: password! }
+      : emailOrPayload;
     const response = await this.client.post<AuthResponse>('/auth/login', payload);
     this.setToken(response.data.token);
     return response.data;

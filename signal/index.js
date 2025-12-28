@@ -11,8 +11,17 @@ const { randomUUID } = require('crypto');
 const { config } = require('./config');
 const { RegisterSchema, LoginSchema, PingCreateSchema, PingUpdateSchema, validate } = require('./validators');
 const errorHandler = require('./middleware/error');
+const { createProjectRoutes, createAssetRoutes, createJobRoutes, createDeliveryRoutes } = require('./routes');
+
+// Enable BigInt serialization to JSON (Prisma uses BigInt for large integers)
+BigInt.prototype.toJSON = function() {
+  return this.toString();
+};
 
 const app = express();
+
+// Trust proxy for rate limiting behind reverse proxies (GitHub Codespaces, etc.)
+app.set('trust proxy', 1);
 
 // Logging
 const logger = process.env.NODE_ENV === 'production'
@@ -73,17 +82,107 @@ const openapi = require('./docs/openapi.json');
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(openapi));
 app.get('/openapi.json', (req, res) => res.json(openapi));
 
-app.get('/health', async (_req, res) => {
+// Public root endpoint
+app.get('/', (_req, res) => {
+  res.json({ 
+    name: 'StudioOS API',
+    version: '0.1.0',
+    status: 'running',
+    docs: '/docs',
+    health: '/health'
+  });
+});
+
+// Track startup time for uptime calculation
+const startupTime = Date.now();
+
+// Liveness probe - indicates the service is running
+app.get('/health', (_req, res) => {
+  res.setHeader('x-request-id', _req.id || '');
+  res.json({ status: 'ok' });
+});
+
+// Readiness probe - indicates the service can accept traffic
+app.get('/health/ready', async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     res.setHeader('x-request-id', _req.id || '');
-    res.json({ status: 'ok', db: 'ok' });
+    res.json({ status: 'ready', db: 'connected' });
   }
   catch (err) {
-    console.error('DB healthcheck failed', err);
-    res.status(500).json({ status: 'error', db: 'unavailable' });
+    logger.error({ err }, 'Readiness check failed: database unavailable');
+    res.status(503).json({ status: 'not_ready', db: 'unavailable' });
   }
 });
+
+// Detailed metrics endpoint for monitoring
+app.get('/health/metrics', async (_req, res) => {
+  const memoryUsage = process.memoryUsage();
+  const uptimeSeconds = Math.floor((Date.now() - startupTime) / 1000);
+  
+  let dbStatus = 'connected';
+  let dbLatencyMs = null;
+  try {
+    const dbStart = Date.now();
+    await prisma.$queryRaw`SELECT 1`;
+    dbLatencyMs = Date.now() - dbStart;
+  }
+  catch (err) {
+    dbStatus = 'unavailable';
+    logger.error({ err }, 'Metrics check: database query failed');
+  }
+  
+  // Get job queue stats
+  let jobStats = { queued: 0, running: 0, completed: 0, failed: 0 };
+  try {
+    const stats = await prisma.$queryRaw`
+      SELECT status, COUNT(*)::int as count 
+      FROM "Job" 
+      GROUP BY status
+    `;
+    for (const row of stats) {
+      const key = row.status.toLowerCase();
+      if (key in jobStats) jobStats[key] = row.count;
+    }
+  }
+  catch (err) {
+    logger.warn({ err }, 'Could not fetch job stats');
+  }
+  
+  res.setHeader('x-request-id', _req.id || '');
+  res.json({
+    status: dbStatus === 'connected' ? 'healthy' : 'degraded',
+    version: '0.1.0',
+    uptime: {
+      seconds: uptimeSeconds,
+      formatted: formatUptime(uptimeSeconds)
+    },
+    database: {
+      status: dbStatus,
+      latencyMs: dbLatencyMs
+    },
+    memory: {
+      heapUsedMB: Math.round(memoryUsage.heapUsed / 1024 / 1024),
+      heapTotalMB: Math.round(memoryUsage.heapTotal / 1024 / 1024),
+      rssMB: Math.round(memoryUsage.rss / 1024 / 1024)
+    },
+    jobs: jobStats,
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+function formatUptime(seconds) {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  const parts = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (mins > 0) parts.push(`${mins}m`);
+  parts.push(`${secs}s`);
+  return parts.join(' ');
+}
 
 const parseId = (value) => {
   const id = Number(value);
@@ -103,7 +202,13 @@ const authenticate = (req, res, next) => {
   const token = header.substring('Bearer '.length);
   try {
     const decoded = jwt.verify(token, jwtSecret);
-    req.user = decoded;
+    // Map JWT payload to req.user with role info
+    req.user = {
+      sub: decoded.sub,
+      email: decoded.email,
+      internalRole: decoded.internalRole || null,
+      externalRole: decoded.externalRole || null
+    };
     next();
   }
   catch (err) {
@@ -115,14 +220,15 @@ const authorizeRole = (role) => (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-  if (req.user.role !== role) {
+  // Check both internal and external roles
+  if (req.user.internalRole !== role && req.user.externalRole !== role) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   next();
 };
 
 app.post('/auth/register', authLimiter, validate(RegisterSchema), async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, internalRole, externalRole } = req.body;
   if (!jwtSecret) {
     return res.status(500).json({ error: 'JWT_SECRET not configured' });
   }
@@ -132,9 +238,29 @@ app.post('/auth/register', authLimiter, validate(RegisterSchema), async (req, re
       return res.status(409).json({ error: 'Email already registered' });
     }
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await prisma.user.create({ data: { email, passwordHash, role: 'USER' } });
-    const token = signToken({ sub: user.id, email: user.email, role: user.role });
-    res.status(201).json({ token });
+    // Default to BASIC internal role if no role specified
+    const userData = { 
+      email, 
+      passwordHash,
+      internalRole: internalRole || 'BASIC',
+      externalRole: externalRole || null
+    };
+    const user = await prisma.user.create({ data: userData });
+    const token = signToken({ 
+      sub: user.id, 
+      email: user.email, 
+      internalRole: user.internalRole,
+      externalRole: user.externalRole
+    });
+    res.status(201).json({ 
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        internalRole: user.internalRole,
+        externalRole: user.externalRole
+      }
+    });
   }
   catch (err) {
     console.error('Register failed', err);
@@ -156,8 +282,21 @@ app.post('/auth/login', authLimiter, validate(LoginSchema), async (req, res) => 
     if (!ok) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    const token = signToken({ sub: user.id, email: user.email, role: user.role });
-    res.json({ token });
+    const token = signToken({ 
+      sub: user.id, 
+      email: user.email, 
+      internalRole: user.internalRole,
+      externalRole: user.externalRole
+    });
+    res.json({ 
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        internalRole: user.internalRole,
+        externalRole: user.externalRole
+      }
+    });
   }
   catch (err) {
     console.error('Login failed', err);
@@ -234,7 +373,7 @@ app.put('/pings/:id', authenticate, validate(PingUpdateSchema), async (req, res)
   }
 });
 
-app.delete('/pings/:id', authenticate, authorizeRole('ADMIN'), async (req, res) => {
+app.delete('/pings/:id', authenticate, authorizeRole('ADVANCED'), async (req, res) => {
   const id = parseId(req.params.id);
   if (!id) {
     return res.status(400).json({ error: 'Invalid id' });
@@ -251,6 +390,20 @@ app.delete('/pings/:id', authenticate, authorizeRole('ADMIN'), async (req, res) 
     res.status(500).json({ error: 'Failed to delete ping' });
   }
 });
+
+// ============================================================================
+// StudioOS API Routes
+// ============================================================================
+
+// Mount StudioOS routes with authentication middleware
+app.use('/api/projects', authenticate, createProjectRoutes(prisma));
+app.use('/api/assets', authenticate, createAssetRoutes(prisma));
+app.use('/api/jobs', authenticate, createJobRoutes(prisma));
+app.use('/api/deliveries', authenticate, createDeliveryRoutes(prisma));
+
+// SSE endpoint for real-time job updates
+const { createJobEventsRouter } = require('./services/jobEvents');
+app.use('/api/events/jobs', authenticate, createJobEventsRouter(prisma));
 
 if (require.main === module) {
   app.listen(port, () => {
