@@ -23,6 +23,65 @@
 
 The time after the 11th hour. Midnight is a NodeJS ORM for SQLite and Turso with full TypeScript support without needing to generate any code. Even complex SQL queries can be written inside of JavaScript.
 
+---
+
+## ⚠️ StudioOS Contributors: Critical Architecture Requirements
+
+> **This repository powers StudioOS.** Before contributing, you **must** understand the architectural constraints below. Violations will be rejected.
+
+### Non-Negotiable Invariants
+
+| Rule | Enforcement |
+|------|-------------|
+| **No DAW metaphors** | No tracks, timelines, plugins, sessions, faders, automation |
+| **Asset → Job → Output model** | All transformations occur through jobs, never direct manipulation |
+| **Immutable assets** | Assets are never modified in-place; changes create new versions |
+| **Deterministic jobs** | Jobs are asynchronous, replayable, and auditable |
+| **RBAC at all layers** | Permissions enforced in UI, API, Job Engine, and AI assistants |
+
+### Forbidden Terminology (Hard Ban)
+
+These terms **must not appear** in any user-facing code, UI, or assistant output:
+
+```
+track, timeline, clip, session, plugin, fader, automation, 
+channel, bus, insert, rack, tweak, adjust, dial in, fine-tune
+```
+
+### Approved Terminology
+
+```
+asset, job, transformation, output, version, report, preset, 
+parameter, workflow, delivery, approval, review, lineage, audit
+```
+
+### State Machine Compliance
+
+All entity states must follow the canonical models:
+
+- **Project**: Draft → Processing → Ready → Delivered
+- **Asset**: Raw → Derived → Final
+- **Job**: Queued → Running → Completed | Failed
+
+Invalid state transitions are architectural violations.
+
+### Documentation Authority
+
+The complete StudioOS specification lives in `signal/docs/STUDIOOS_*.md`:
+
+| Document | Scope |
+|----------|-------|
+| `STUDIOOS_FUNCTIONAL_SPECS.md` | What exists and what it may do |
+| `STUDIOOS_RBAC_MATRIX.md` | Who can do what |
+| `STUDIOOS_STATE_LIFECYCLE_SPECS.md` | Valid states and transitions |
+| `STUDIOOS_LANGUAGE_USAGE.md` | Approved and forbidden vocabulary |
+| `STUDIOOS_TRANSPARENCY_CHARTER.md` | How the system explains itself |
+| `DEVELOPMENT_STANDARDS.md` | AI assistant operating contract |
+
+**If a feature is not defined in these documents, it does not exist.**
+
+---
+
 Tables are written in JavaScript like this:
 
 ```js
