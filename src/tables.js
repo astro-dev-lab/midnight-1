@@ -648,7 +648,7 @@ const toString = (tokenizer) => {
     sql += ` separators '${separators}'`;
   }
   if (caseSensitive !== undefined) {
-    sql += ` casesensitive ${caseSensitive ? 1 : 0}`;
+    sql += ` case_sensitive ${caseSensitive ? 1 : 0}`;
   }
   return sql;
 }

@@ -1164,7 +1164,7 @@ const match = async (config) => {
     sql = `select ${select} from ${table} where ${table} match $${placeholder}`;
     params[placeholder] = parse(query);
   }
-  sql += toKeywords(query, params);
+  sql += toKeywords(query, params, table, db.tables[table]);
   const options = {
     query: sql,
     params,
