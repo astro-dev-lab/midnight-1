@@ -176,32 +176,36 @@ const processWindow = (options) => {
         following
       } = frame;
       clause += ` ${type} between `;
-      if (currentRow) {
-        clause += 'current row and ';
-      }
+      // Start of frame (preceding or current row)
       if (preceding !== undefined) {
         if (preceding === 'unbounded') {
-          clause += 'unbounded preceding and ';
+          clause += 'unbounded preceding';
+        }
+        else if (Number.isInteger(preceding)) {
+          clause += `${preceding} preceding`;
         }
         else {
-          if (Number.isInteger(preceding)) {
-            clause += `${preceding} preceding and `;
-          }
-          else {
-            throw Error('Invalid "preceding" argument');
-          }
+          throw Error('Invalid "preceding" argument');
         }
       }
+      else if (currentRow) {
+        clause += 'current row';
+      }
+      clause += ' and ';
+      // End of frame (following or current row)
       if (following === 'unbounded') {
         clause += 'unbounded following';
       }
-      else {
-        if (Number.isInteger(following)) {
-          clause += `${following} following and `;
+      else if (Number.isInteger(following)) {
+        if (following === 0) {
+          clause += 'current row';
         }
         else {
-          throw Error('Invalid "following" argument');
+          clause += `${following} following`;
         }
+      }
+      else {
+        throw Error('Invalid "following" argument');
       }
     }
     sql += ` over (${clause.trim()})`;
@@ -399,7 +403,7 @@ const processMethod = (options) => {
       if (!Number.isInteger(groups)) {
         throw Error('Invalid "groups" argument');
       }
-      sql = `ntil(${groups})`;
+      sql = `ntile(${groups})`;
     }
     else if (name === 'lag' || name === 'lead') {
       const { expression, offset, otherwise } = arg;
