@@ -225,7 +225,8 @@ class Database {
     }
     
     this.cacheStats.hits++;
-    return entry.data;
+    // Clone on retrieval to prevent mutations affecting cached data
+    return structuredClone(entry.data);
   }
 
   /**
@@ -249,21 +250,23 @@ class Database {
    */
   extractTablesFromSql(sql) {
     const tables = new Set();
-    // Match "from table" and "join table" patterns
-    const fromMatch = sql.match(/from\s+(\w+)/gi);
-    const joinMatch = sql.match(/join\s+(\w+)/gi);
+    // Match various patterns: "from table", "join table", "into table", "update table"
+    const patterns = [
+      /from\s+(\w+)/gi,
+      /join\s+(\w+)/gi,
+      /into\s+(\w+)/gi,
+      /update\s+(\w+)/gi,
+      /delete\s+from\s+(\w+)/gi
+    ];
     
-    if (fromMatch) {
-      fromMatch.forEach(m => {
-        const table = m.split(/\s+/)[1];
-        if (table && !table.startsWith('(')) tables.add(table);
-      });
-    }
-    if (joinMatch) {
-      joinMatch.forEach(m => {
-        const table = m.split(/\s+/)[1];
-        if (table) tables.add(table);
-      });
+    for (const pattern of patterns) {
+      let match;
+      while ((match = pattern.exec(sql)) !== null) {
+        const table = match[1];
+        if (table && !table.startsWith('(')) {
+          tables.add(table.toLowerCase());
+        }
+      }
     }
     
     return tables;
@@ -275,7 +278,14 @@ class Database {
   invalidateCache(tables) {
     if (!this.cacheEnabled || this.cache.size === 0) return;
     
-    const tablesToInvalidate = Array.isArray(tables) ? new Set(tables) : new Set([tables]);
+    let tablesToInvalidate;
+    if (tables instanceof Set) {
+      tablesToInvalidate = tables;
+    } else if (Array.isArray(tables)) {
+      tablesToInvalidate = new Set(tables.map(t => t.toLowerCase()));
+    } else {
+      tablesToInvalidate = new Set([tables.toLowerCase()]);
+    }
     
     for (const [key, entry] of this.cache.entries()) {
       for (const table of entry.tables) {
