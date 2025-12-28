@@ -285,14 +285,18 @@ const upsert = async (args) => {
     tx
   } = args;
   const { values, target, set } = options;
+  
+  // Run beforeUpsert hooks - can modify values
+  let processedValues = await db.runBeforeHooks(table, 'beforeUpsert', values, { tx, target, set });
+  
   const params = {};
-  validateInsertValues(db, table, values);
+  validateInsertValues(db, table, processedValues);
   if (set) {
     validateUpdateValues(db, table, set);
   }
-  const query = adjust(db, table, values);
+  const query = adjust(db, table, processedValues);
   let sql = makeInsertSql(db, table, query, params);
-  verify(Object.keys(values));
+  verify(Object.keys(processedValues));
   if (target && set) {
     verify([target]);
     verify(Object.keys(set));
@@ -305,7 +309,12 @@ const upsert = async (args) => {
   }
   const primaryKey = db.getPrimaryKey(table);
   sql += ` returning ${primaryKey}`;
-  return await processInsert(db, sql, params, primaryKey, tx);
+  const result = await processInsert(db, sql, params, primaryKey, tx);
+  
+  // Run afterUpsert hooks
+  await db.runAfterHooks(table, 'afterUpsert', result, processedValues, { tx, target, set });
+  
+  return result;
 }
 
 const insert = async (args) => {
@@ -315,15 +324,24 @@ const insert = async (args) => {
     values,
     tx
   } = args;
-  validateInsertValues(db, table, values);
-  const columns = Object.keys(values);
+  
+  // Run beforeInsert hooks - can modify values
+  let processedValues = await db.runBeforeHooks(table, 'beforeInsert', values, { tx });
+  
+  validateInsertValues(db, table, processedValues);
+  const columns = Object.keys(processedValues);
   verify(columns);
-  const adjusted = adjust(db, table, values);
+  const adjusted = adjust(db, table, processedValues);
   const params = {};
   const sql = makeInsertSql(db, table, adjusted, params);
   const primaryKey = db.getPrimaryKey(table);
   const query = `${sql} returning ${primaryKey}`;
-  return await processInsert(db, query, params, primaryKey, tx);
+  const result = await processInsert(db, query, params, primaryKey, tx);
+  
+  // Run afterInsert hooks
+  await db.runAfterHooks(table, 'afterInsert', result, processedValues, { tx });
+  
+  return result;
 }
 
 const batchInserts = async (tx, db, table, items) => {
@@ -472,11 +490,15 @@ const update = async (args) => {
     tx
   } = args;
   const { where, set } = options;
-  const keys = Object.keys(set);
+  
+  // Run beforeUpdate hooks - can modify set values
+  let processedSet = await db.runBeforeHooks(table, 'beforeUpdate', set, { tx, where });
+  
+  const keys = Object.keys(processedSet);
   verify(keys);
-  validateUpdateValues(db, table, set);
+  validateUpdateValues(db, table, processedSet);
   const params = {};
-  const query = adjust(db, table, set);
+  const query = adjust(db, table, processedSet);
   const setString = createSetClause(db, table, query, params);
   let sql = `update ${table} set ${setString}`;
   if (where) {
@@ -494,7 +516,12 @@ const update = async (args) => {
     params,
     tx
   };
-  return await db.run(runOptions);
+  const result = await db.run(runOptions);
+  
+  // Run afterUpdate hooks
+  await db.runAfterHooks(table, 'afterUpdate', result, processedSet, { tx, where });
+  
+  return result;
 }
 
 const getOrderBy = (orderBy, params) => {
@@ -1288,6 +1315,10 @@ const remove = async (args) => {
     query,
     tx
   } = args;
+  
+  // Run beforeDelete hooks
+  await db.runBeforeHooks(table, 'beforeDelete', query, { tx });
+  
   let sql = `delete from ${table}`;
   const params = {};
   const clause = toWhere({
@@ -1303,7 +1334,12 @@ const remove = async (args) => {
     params,
     tx
   };
-  return await db.run(options);
+  const result = await db.run(options);
+  
+  // Run afterDelete hooks
+  await db.runAfterHooks(table, 'afterDelete', result, query, { tx });
+  
+  return result;
 }
 
 /**

@@ -421,6 +421,48 @@ const trees = await db.trees
 const changes = await db.moons.delete({ id: 100 });
 ```
 
+## Lifecycle Hooks
+
+Register hooks to run before or after insert, update, upsert, and delete operations:
+
+```js
+// Normalize email before insert
+db.addHook('users', 'beforeInsert', (data, ctx) => {
+  return {
+    ...data,
+    email: data.email.toLowerCase()
+  };
+});
+
+// Audit log after insert
+db.addHook('users', 'afterInsert', async (result, data, ctx) => {
+  await db.auditLog.insert({
+    action: 'INSERT',
+    tableName: ctx.table,
+    recordId: result
+  });
+});
+
+// Auto-update timestamps
+db.addHook('users', 'beforeUpdate', (data, ctx) => {
+  return { ...data, updatedAt: new Date() };
+});
+```
+
+Available hooks: `beforeInsert`, `afterInsert`, `beforeUpdate`, `afterUpdate`, `beforeDelete`, `afterDelete`, `beforeUpsert`, `afterUpsert`.
+
+**Before hooks** receive `(data, context)` and can return modified data. **After hooks** receive `(result, data, context)` for side effects.
+
+```js
+// Remove a hook
+const myHook = (data) => data;
+db.addHook('users', 'beforeInsert', myHook);
+db.removeHook('users', 'beforeInsert', myHook);
+
+// Clear all hooks for a table
+db.clearHooks('users');
+```
+
 ## Transactions
 
 Transactions lock all writes to the database until they are complete.

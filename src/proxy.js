@@ -198,6 +198,10 @@ const makeClient = (db, tx) => {
       if (['enableCache', 'clearCache', 'getCacheStats', 'resetCacheStats', 'invalidateCache'].includes(table)) {
         return (...args) => db[table](...args);
       }
+      // Hook methods
+      if (['addHook', 'removeHook', 'clearHooks'].includes(table)) {
+        return (...args) => db[table](...args);
+      }
       if (table === 'use') {
         return (subquery) => {
           return new Proxy({}, makeQueryHandler({ 

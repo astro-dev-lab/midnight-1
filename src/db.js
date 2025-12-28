@@ -42,6 +42,9 @@ class Database {
     this.cacheDefaultTTL = 60000; // 60 seconds default
     this.cacheStats = { hits: 0, misses: 0, invalidations: 0 };
     
+    // Lifecycle hooks: { tableName: { hookName: [fn, fn, ...] } }
+    this.hooks = {};
+    
     this.registerTypes([
       {
         name: 'boolean',
@@ -324,6 +327,102 @@ class Database {
    */
   resetCacheStats() {
     this.cacheStats = { hits: 0, misses: 0, invalidations: 0 };
+  }
+
+  // ---- Lifecycle Hooks ----
+
+  /**
+   * Valid hook names
+   */
+  static HOOK_NAMES = [
+    'beforeInsert', 'afterInsert',
+    'beforeUpdate', 'afterUpdate', 
+    'beforeDelete', 'afterDelete',
+    'beforeUpsert', 'afterUpsert'
+  ];
+
+  /**
+   * Register a hook for a table
+   * @param {string} table - Table name (lowercase)
+   * @param {string} hookName - One of: beforeInsert, afterInsert, beforeUpdate, afterUpdate, beforeDelete, afterDelete, beforeUpsert, afterUpsert
+   * @param {Function} fn - Hook function. For 'before' hooks, receives (data, context) and can return modified data. For 'after' hooks, receives (result, data, context).
+   */
+  addHook(table, hookName, fn) {
+    if (!Database.HOOK_NAMES.includes(hookName)) {
+      throw new Error(`Invalid hook name: ${hookName}. Valid hooks: ${Database.HOOK_NAMES.join(', ')}`);
+    }
+    if (typeof fn !== 'function') {
+      throw new Error('Hook must be a function');
+    }
+    const tableLower = table.toLowerCase();
+    if (!this.hooks[tableLower]) {
+      this.hooks[tableLower] = {};
+    }
+    if (!this.hooks[tableLower][hookName]) {
+      this.hooks[tableLower][hookName] = [];
+    }
+    this.hooks[tableLower][hookName].push(fn);
+  }
+
+  /**
+   * Remove a hook
+   */
+  removeHook(table, hookName, fn) {
+    const tableLower = table.toLowerCase();
+    if (!this.hooks[tableLower] || !this.hooks[tableLower][hookName]) {
+      return false;
+    }
+    const index = this.hooks[tableLower][hookName].indexOf(fn);
+    if (index > -1) {
+      this.hooks[tableLower][hookName].splice(index, 1);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Clear all hooks for a table or all tables
+   */
+  clearHooks(table) {
+    if (table) {
+      delete this.hooks[table.toLowerCase()];
+    } else {
+      this.hooks = {};
+    }
+  }
+
+  /**
+   * Run 'before' hooks - can modify data
+   * @returns {Promise<any>} Modified data or original if no hooks
+   */
+  async runBeforeHooks(table, hookName, data, context = {}) {
+    const tableLower = table.toLowerCase();
+    const hooks = this.hooks[tableLower]?.[hookName];
+    if (!hooks || hooks.length === 0) {
+      return data;
+    }
+    let result = data;
+    for (const hook of hooks) {
+      const modified = await hook(result, { table: tableLower, ...context });
+      if (modified !== undefined) {
+        result = modified;
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Run 'after' hooks - for side effects
+   */
+  async runAfterHooks(table, hookName, result, data, context = {}) {
+    const tableLower = table.toLowerCase();
+    const hooks = this.hooks[tableLower]?.[hookName];
+    if (!hooks || hooks.length === 0) {
+      return;
+    }
+    for (const hook of hooks) {
+      await hook(result, data, { table: tableLower, ...context });
+    }
   }
 
   now() {

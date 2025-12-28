@@ -91,6 +91,33 @@ interface CursorPaginateQuery<W, K, T> {
   desc?: boolean;
 }
 
+/** Valid hook names */
+type HookName = 
+  | 'beforeInsert' | 'afterInsert'
+  | 'beforeUpdate' | 'afterUpdate'
+  | 'beforeDelete' | 'afterDelete'
+  | 'beforeUpsert' | 'afterUpsert';
+
+/** Context passed to hook functions */
+interface HookContext {
+  table: string;
+  tx?: any;
+  where?: any;
+  target?: string;
+  set?: any;
+}
+
+/** 
+ * Before hook function - can modify data
+ * Return undefined to keep original data, or return modified data
+ */
+type BeforeHookFn<T = any> = (data: T, context: HookContext) => T | undefined | Promise<T | undefined>;
+
+/**
+ * After hook function - for side effects
+ */
+type AfterHookFn<T = any, R = any> = (result: R, data: T, context: HookContext) => void | Promise<void>;
+
 interface Keywords<T, K> {
   orderBy?: K | ((column: T, method: ComputeMethods) => void);
   desc?: boolean;
@@ -1382,6 +1409,12 @@ export class Database {
   rollback(): Promise<void>;
   setLogger(logger: QueryLogger, options?: LogOptions): void;
   explain(expression: any): Promise<Array<any>>;
+  /** Register a lifecycle hook for a table */
+  addHook(table: string, hookName: HookName, fn: BeforeHookFn | AfterHookFn): void;
+  /** Remove a previously registered hook */
+  removeHook(table: string, hookName: HookName, fn: BeforeHookFn | AfterHookFn): boolean;
+  /** Clear all hooks for a table, or all hooks if no table specified */
+  clearHooks(table?: string): void;
 }
 
 export class SQLiteDatabase extends Database {
