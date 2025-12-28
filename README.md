@@ -888,6 +888,94 @@ In the above example, ```moon``` will be of type ```string``` or ```null``` even
 
 ```join```: a tuple or array of tuples representing the keys to join on.
 
+## Query caching
+
+Enable in-memory caching to reduce database load for frequently-read data:
+
+```js
+// Enable caching with default TTL (60 seconds)
+db.enableCache();
+
+// Custom TTL (30 seconds) and max entries (500)
+db.enableCache({ ttl: 30000, maxEntries: 500 });
+
+// Queries are now cached automatically
+const users = await db.users.many(); // Cache miss, queries DB
+const users2 = await db.users.many(); // Cache hit
+
+// Cache invalidates automatically on writes
+await db.users.insert({ name: 'New User' });
+const users3 = await db.users.many(); // Cache miss, fresh data
+```
+
+Manage the cache:
+
+```js
+// Check cache statistics
+const stats = db.getCacheStats();
+// { hits: 10, misses: 5, hitRate: 0.667, size: 3 }
+
+// Manually invalidate specific tables
+db.invalidateCache('users');
+db.invalidateCache(['users', 'posts']);
+
+// Clear entire cache
+db.clearCache();
+
+// Disable caching
+db.disableCache();
+```
+
+The cache uses SQL + parameters as the key and automatically invalidates entries when their underlying tables are modified by insert, update, upsert, or delete operations.
+
+## Database statistics
+
+Monitor database performance with built-in metrics:
+
+```js
+const stats = db.getStats();
+```
+
+The returned object includes:
+
+```js
+{
+  queries: {
+    total: 150,        // Total queries executed
+    reads: 120,        // SELECT queries
+    writes: 30,        // INSERT/UPDATE/DELETE
+    errors: 2,         // Failed queries
+    avgDurationMs: 1.5,// Average query time
+    slowQueries: 3     // Queries exceeding threshold
+  },
+  transactions: {
+    total: 10,         // Completed transactions
+    active: 0          // Currently open transactions
+  },
+  writerLock: {
+    totalWaits: 5,     // Times waited for write lock
+    totalWaitTimeMs: 12,
+    avgWaitTimeMs: 2.4
+  },
+  cache: {             // Only if caching enabled
+    hits: 50,
+    misses: 20,
+    hitRate: 0.714,
+    size: 15
+  }
+}
+```
+
+Configure and reset stats:
+
+```js
+// Set slow query threshold (default: 100ms)
+db.setSlowQueryThreshold(50);
+
+// Reset all statistics
+db.resetStats();
+```
+
 ## Full-text search
 
 The below example creates a fts5 table with three columns, one of which is only used for referencing other tables and so is removed from indexing.
