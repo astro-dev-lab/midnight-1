@@ -116,12 +116,8 @@ const adjust = (db, table, params) => {
   const adjusted = db.adjust(params);
   const processed = {};
   for (const [name, value] of Object.entries(adjusted)) {
-    if (columnTypes[name] === 'json') {
-      processed[name] = JSON.stringify(value);
-    }
-    else {
-      processed[name] = value;
-    }
+    // jsToDb already handles JSON stringification, no need to double-stringify
+    processed[name] = value;
   }
   return processed;
 }
