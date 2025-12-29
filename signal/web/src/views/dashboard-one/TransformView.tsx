@@ -1,13 +1,32 @@
 /**
  * Dashboard One - Transform View
  * 
- * Submit processing jobs with preset selection and parameter configuration.
- * Per STUDIOOS_FUNCTIONAL_SPECS.md Section 4.4
+ * ============================================================================
+ * PERSONA: Producer/Engineer
+ * ============================================================================
+ * 
+ * PRIMARY QUESTION: "What processing should be applied to my audio?"
+ * 
+ * SUCCESS CONDITION: User selects a preset and submits job confidently
+ * 
+ * COMPONENT USAGE:
+ * - QualityPresets: Select processing configuration
+ *   Role-gated access to custom mode
+ * - AudioVisualization: Show current audio state
+ *   Visual reference before processing
+ * 
+ * RBAC ENFORCEMENT:
+ * - Basic: Preset only (custom disabled)
+ * - Standard: Bounded parameters
+ * - Advanced: Full parameter access
+ * 
+ * ============================================================================
  */
 
-import { useEffect, useState } from 'react';
-import { useProjects, useAssets, usePresets, studioOS } from '../../api';
-import type { Asset, Preset } from '../../api';
+import { useMemo, useEffect, useState } from 'react';
+import { useProjects, useAssets, studioOS } from '../../api';
+import { QualityPresets, AudioVisualization } from '../../components/core';
+import type { Asset } from '../../api';
 
 interface TransformViewProps {
   projectId?: number | null;
@@ -15,16 +34,13 @@ interface TransformViewProps {
   onNavigate: (view: string, id?: number) => void;
 }
 
-export function TransformView({ projectId: _projectId, role, onNavigate }: TransformViewProps) {
+export function TransformView({ projectId, role, onNavigate }: TransformViewProps) {
   const { data: projectsResponse, loading: loadingProjects } = useProjects();
-  const { data: presetsData, loading: loadingPresets } = usePresets();
-  const projects = projectsResponse?.data || [];
-  const presets: Preset[] = presetsData || [];
+  const projects = useMemo(() => projectsResponse?.data || [], [projectsResponse]);
   
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(projectId || null);
   const [selectedAssetIds, setSelectedAssetIds] = useState<number[]>([]);
-  const [selectedPreset, setSelectedPreset] = useState('');
-  const [parameters, setParameters] = useState<Record<string, number>>({});
+  const [selectedPreset, setSelectedPreset] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -35,9 +51,8 @@ export function TransformView({ projectId: _projectId, role, onNavigate }: Trans
   // Filter out Final assets - they cannot be used as job inputs
   const assets: Asset[] = allAssets.filter((a: Asset) => a.category !== 'FINAL');
 
-  // Role-based parameter access
+  // Role-based access
   const canAdjustParameters = role === 'STANDARD' || role === 'ADVANCED';
-  const hasFullParameters = role === 'ADVANCED';
 
   // Select first project by default
   useEffect(() => {
@@ -70,14 +85,12 @@ export function TransformView({ projectId: _projectId, role, onNavigate }: Trans
       await studioOS.submitJob({
         projectId: selectedProjectId,
         preset: selectedPreset,
-        parameters: canAdjustParameters ? parameters : undefined,
         assetIds: selectedAssetIds
       });
 
       setSuccess(true);
       setSelectedAssetIds([]);
       setSelectedPreset('');
-      setParameters({});
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to submit job');
     } finally {
@@ -85,7 +98,7 @@ export function TransformView({ projectId: _projectId, role, onNavigate }: Trans
     }
   };
 
-  const loading = loadingProjects || loadingPresets;
+  const loading = loadingProjects;
 
   if (loading) {
     return <div className="view-loading">Loading...</div>;
@@ -93,141 +106,112 @@ export function TransformView({ projectId: _projectId, role, onNavigate }: Trans
 
   return (
     <div className="transform-view">
-      <h2>Transform</h2>
+      <header className="view-header">
+        <h2 className="view-title">Transform</h2>
+        <p className="view-subtitle">Configure processing parameters for your assets</p>
+      </header>
+
+      {/* Audio Analysis — Component: AudioVisualization */}
+      <section className="analysis-section">
+        <h3 className="section-title">Audio Analysis</h3>
+        <div className="visualization-grid">
+          <div className="viz-panel">
+            <AudioVisualization type="spectrum" height={140} showLabels />
+          </div>
+          <div className="viz-panel">
+            <AudioVisualization type="levels" height={140} showLabels />
+          </div>
+        </div>
+      </section>
 
       <form onSubmit={handleSubmit}>
         {/* Project Selection */}
-        <div className="form-group">
-          <label>Project</label>
+        <section className="form-section">
+          <h3 className="section-title">1. Select Project</h3>
           <select 
             value={selectedProjectId || ''} 
             onChange={(e) => {
               setSelectedProjectId(parseInt(e.target.value));
               setSelectedAssetIds([]);
             }}
+            className="project-select"
           >
             <option value="">Select Project</option>
             {projects.map(p => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
-        </div>
+        </section>
 
         {/* Asset Selection */}
-        <div className="form-group">
-          <label>Input Assets</label>
-          <p className="help-text">
-            Select assets to process. Final assets cannot be used as inputs.
-          </p>
-          <div className="asset-checkboxes">
-            {assets.length === 0 ? (
-              <p>No processable assets available.</p>
-            ) : (
-              assets.map(asset => (
-                <label key={asset.id} className="checkbox-label">
+        <section className="form-section">
+          <h3 className="section-title">2. Select Assets ({selectedAssetIds.length} selected)</h3>
+          {loadingAssets ? (
+            <p className="loading-text">Loading assets...</p>
+          ) : assets.length === 0 ? (
+            <p className="empty-message">No processable assets available.</p>
+          ) : (
+            <div className="asset-checkboxes">
+              {assets.map(asset => (
+                <label key={asset.id} className="asset-checkbox">
                   <input
                     type="checkbox"
                     checked={selectedAssetIds.includes(asset.id)}
                     onChange={() => handleAssetToggle(asset.id)}
                   />
-                  {asset.name} ({asset.category})
+                  <span className="asset-name">{asset.name}</span>
+                  <span className={`category-badge category-${asset.category.toLowerCase()}`}>
+                    {asset.category}
+                  </span>
                 </label>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Preset Selection */}
-        <div className="form-group">
-          <label>Preset</label>
-          {loadingPresets ? (
-            <p>Loading presets...</p>
-          ) : (
-            <select 
-              value={selectedPreset} 
-              onChange={(e) => setSelectedPreset(e.target.value)}
-            >
-              <option value="">Select Preset</option>
-              {presets.map(preset => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.name} - {preset.description}
-                </option>
               ))}
-            </select>
-          )}
-        </div>
-
-        {/* Parameter Controls (role-gated) */}
-        {canAdjustParameters && (
-          <div className="form-group parameters">
-            <label>Parameters</label>
-            {!hasFullParameters && (
-              <p className="help-text">
-                Standard role: parameters are bounded within safe ranges.
-              </p>
-            )}
-            
-            <div className="parameter-sliders">
-              <div className="parameter">
-                <label>Gain (dB): {parameters.gain || 0}</label>
-                <input
-                  type="range"
-                  min={hasFullParameters ? -24 : -12}
-                  max={hasFullParameters ? 24 : 12}
-                  value={parameters.gain || 0}
-                  onChange={(e) => setParameters({...parameters, gain: parseInt(e.target.value)})}
-                />
-              </div>
-              
-              <div className="parameter">
-                <label>Compression: {parameters.compression || 0}%</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={parameters.compression || 0}
-                  onChange={(e) => setParameters({...parameters, compression: parseInt(e.target.value)})}
-                />
-              </div>
-
-              <div className="parameter">
-                <label>Target Level (LUFS): {parameters.normalization || -14}</label>
-                <input
-                  type="range"
-                  min={hasFullParameters ? -24 : -18}
-                  max="0"
-                  value={parameters.normalization || -14}
-                  onChange={(e) => setParameters({...parameters, normalization: parseInt(e.target.value)})}
-                />
-              </div>
             </div>
+          )}
+        </section>
+
+        {/* Preset Selection — Component: QualityPresets */}
+        <section className="form-section preset-section">
+          <h3 className="section-title">3. Select Processing Preset</h3>
+          <div className="component-container">
+            <QualityPresets
+              selectedPreset={selectedPreset}
+              onPresetChange={(preset) => setSelectedPreset(preset)}
+              disabled={false}
+            />
           </div>
-        )}
+          
+          {!canAdjustParameters && (
+            <p className="role-notice">
+              Basic role: Using preset defaults. Upgrade to Standard for parameter control.
+            </p>
+          )}
+        </section>
 
-        {!canAdjustParameters && (
-          <p className="role-notice">
-            Basic role: Using preset defaults. Upgrade to Standard for parameter control.
-          </p>
-        )}
+        {/* Submit */}
+        <section className="form-section submit-section">
+          {error && <div className="form-error">{error}</div>}
+          
+          {success && (
+            <div className="form-success">
+              Job submitted successfully!
+              <button 
+                type="button" 
+                onClick={() => onNavigate('history')}
+                className="btn-link"
+              >
+                View in History →
+              </button>
+            </div>
+          )}
 
-        {error && <div className="form-error">{error}</div>}
-        
-        {success && (
-          <div className="form-success">
-            Job submitted successfully!
-            <button 
-              type="button" 
-              onClick={() => onNavigate('history')}
-              style={{ marginLeft: '10px' }}
-            >
-              View in History
-            </button>
-          </div>
-        )}
-
-        <button type="submit" disabled={submitting}>
-          {submitting ? 'Submitting...' : 'Submit Job'}
-        </button>
+          <button 
+            type="submit" 
+            disabled={submitting || !selectedPreset || selectedAssetIds.length === 0}
+            className="btn-submit"
+          >
+            {submitting ? 'Submitting...' : 'Submit Processing Job'}
+          </button>
+        </section>
       </form>
     </div>
   );

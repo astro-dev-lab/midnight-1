@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { FormField } from '../FormField';
+import { studioOS } from '../../api/client';
+import { jobEvents } from '../../api/events';
+import type { Job as ApiJob, JobProgressEvent } from '../../api/types';
 import './JobManager.css';
 
 interface Job {
@@ -31,10 +34,11 @@ interface QueueStats {
 }
 
 interface JobManagerProps {
-  wsUrl?: string;
+  projectId?: number;
+  onJobSelect?: (job: Job | null) => void;
 }
 
-const PRIORITY_NAMES = {
+const PRIORITY_NAMES: Record<number, string> = {
   0: 'Critical',
   1: 'High', 
   2: 'Normal',
@@ -42,7 +46,7 @@ const PRIORITY_NAMES = {
   4: 'Bulk'
 };
 
-const STATE_COLORS = {
+const STATE_COLORS: Record<string, string> = {
   queued: 'var(--color-border)',
   running: 'var(--color-primary)',
   completed: '#22c55e',
@@ -52,127 +56,137 @@ const STATE_COLORS = {
 };
 
 export const JobManager: React.FC<JobManagerProps> = ({
-  wsUrl = '/api/jobs/ws'
+  projectId,
+  onJobSelect
 }) => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [stats, setStats] = useState<QueueStats | null>(null);
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('all');
   const [isConnected, setIsConnected] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Convert API job to component format
+  const mapApiJob = (apiJob: ApiJob): Job => ({
+    id: String(apiJob.id),
+    type: apiJob.preset.split('-')[0] || 'process',
+    priority: 2, // Default to Normal priority
+    state: apiJob.state.toLowerCase(),
+    progress: {
+      phase: apiJob.state === 'RUNNING' ? 'processing' : apiJob.state.toLowerCase(),
+      percent: apiJob.state === 'COMPLETED' ? 100 : apiJob.state === 'RUNNING' ? 50 : 0,
+      message: apiJob.errorMessage || getPhaseMessage(apiJob.state)
+    },
+    createdAt: new Date(apiJob.createdAt).getTime(),
+    startedAt: apiJob.startedAt ? new Date(apiJob.startedAt).getTime() : undefined,
+    completedAt: apiJob.completedAt ? new Date(apiJob.completedAt).getTime() : undefined,
+    attempts: 1,
+    maxAttempts: 3,
+    error: apiJob.errorMessage
+  });
+
+  const getPhaseMessage = (state: string): string => {
+    switch (state) {
+      case 'QUEUED': return 'Waiting in queue';
+      case 'RUNNING': return 'Processing audio data';
+      case 'COMPLETED': return 'Processing complete';
+      case 'FAILED': return 'Processing failed';
+      default: return 'Unknown state';
+    }
+  };
 
   useEffect(() => {
-    // In a real implementation, this would connect to WebSocket
-    // For demo, we'll simulate job updates
-    const mockJobs = generateMockJobs();
-    setJobs(mockJobs);
-    
-    const mockStats = {
-      processed: 1247,
-      failed: 23,
-      retries: 56,
-      queued: mockJobs.filter(j => j.state === 'queued').length,
-      running: mockJobs.filter(j => j.state === 'running').length,
-      avgProcessingTime: 12500,
-      queueCounts: {
-        0: 0, // Critical
-        1: 2, // High
-        2: 8, // Normal
-        3: 4, // Low
-        4: 1  // Bulk
+    if (!projectId || projectId <= 0) {
+      setIsLoading(false);
+      return;
+    }
+
+    const loadJobs = async () => {
+      try {
+        const response = await studioOS.getJobs(projectId);
+        const mappedJobs = response.data.map(mapApiJob);
+        setJobs(mappedJobs);
+        
+        // Calculate stats from real data
+        setStats({
+          processed: mappedJobs.filter(j => j.state === 'completed').length,
+          failed: mappedJobs.filter(j => j.state === 'failed').length,
+          retries: 0,
+          queued: mappedJobs.filter(j => j.state === 'queued').length,
+          running: mappedJobs.filter(j => j.state === 'running').length,
+          avgProcessingTime: calculateAvgProcessingTime(mappedJobs),
+          queueCounts: { 0: 0, 1: 0, 2: mappedJobs.filter(j => j.state === 'queued').length, 3: 0, 4: 0 }
+        });
+      } catch (error) {
+        console.error('Failed to load jobs:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
-    setStats(mockStats);
+
+    loadJobs();
+
+    // Connect to SSE for real-time updates
+    jobEvents.connect(projectId);
     setIsConnected(true);
 
-    // Simulate live updates
-    const interval = setInterval(() => {
+    const unsubscribe = jobEvents.on('*', (event: JobProgressEvent) => {
       setJobs(prev => prev.map(job => {
-        if (job.state === 'running' && Math.random() > 0.8) {
+        if (job.id === String(event.jobId)) {
           return {
             ...job,
+            state: event.phase || job.state,
             progress: {
-              ...job.progress,
-              percent: Math.min(100, job.progress.percent + Math.random() * 20),
-              message: getRandomProgressMessage(job.type)
-            }
+              phase: event.phase || job.progress.phase,
+              percent: event.progress || job.progress.percent,
+              message: event.message || job.progress.message
+            },
+            error: event.error
           };
         }
         return job;
       }));
-    }, 2000);
+    });
 
-    return () => clearInterval(interval);
-  }, [wsUrl]);
-
-  const generateMockJobs = (): Job[] => {
-    const jobTypes = ['analyze', 'process', 'export', 'validate', 'metadata'];
-    const states = ['queued', 'running', 'completed', 'failed', 'retrying'];
-    
-    return Array.from({ length: 15 }, (_, i) => ({
-      id: `job_${Date.now()}_${i}`,
-      type: jobTypes[Math.floor(Math.random() * jobTypes.length)],
-      priority: Math.floor(Math.random() * 5),
-      state: states[Math.floor(Math.random() * states.length)],
-      progress: {
-        phase: 'processing',
-        percent: Math.floor(Math.random() * 100),
-        message: 'Processing audio data'
-      },
-      createdAt: Date.now() - Math.random() * 3600000,
-      startedAt: Date.now() - Math.random() * 1800000,
-      attempts: Math.floor(Math.random() * 3),
-      maxAttempts: 3,
-      error: Math.random() > 0.8 ? 'Network timeout during analysis' : undefined
-    }));
-  };
-
-  const getRandomProgressMessage = (type: string): string => {
-    const messages = {
-      analyze: ['Analyzing frequency spectrum', 'Calculating loudness', 'Detecting audio problems'],
-      process: ['Applying normalization', 'Peak limiting', 'Rendering output'],
-      export: ['Converting format', 'Compressing audio', 'Uploading to destination'],
-      validate: ['Checking compliance', 'Validating metadata', 'Running quality tests'],
-      metadata: ['Extracting metadata', 'Validating ISRC codes', 'Updating database']
+    return () => {
+      unsubscribe();
+      jobEvents.disconnect();
+      setIsConnected(false);
     };
-    
-    const typeMessages = messages[type] || ['Processing'];
-    return typeMessages[Math.floor(Math.random() * typeMessages.length)];
+  }, [projectId]);
+
+  const calculateAvgProcessingTime = (jobs: Job[]): number => {
+    const completedJobs = jobs.filter(j => j.completedAt && j.startedAt);
+    if (completedJobs.length === 0) return 0;
+    const total = completedJobs.reduce((sum, j) => sum + ((j.completedAt || 0) - (j.startedAt || 0)), 0);
+    return total / completedJobs.length;
   };
 
   const cancelJob = async (jobId: string) => {
     try {
-      const response = await fetch(`/api/jobs/${jobId}/cancel`, {
-        method: 'POST'
-      });
-      
-      if (response.ok) {
-        setJobs(prev => prev.map(job => 
-          job.id === jobId ? { ...job, state: 'cancelled' } : job
-        ));
-      }
+      await studioOS.cancelJob(parseInt(jobId));
+      setJobs(prev => prev.map(job => 
+        job.id === jobId ? { ...job, state: 'cancelled' } : job
+      ));
     } catch (error) {
-      console.error('Failed to cancel job:', error);
+      console.error('The job cancellation failed due to System error. You may retry the cancellation.', error);
     }
   };
 
   const retryJob = async (jobId: string) => {
     try {
-      const response = await fetch(`/api/jobs/${jobId}/retry`, {
-        method: 'POST'
-      });
-      
-      if (response.ok) {
-        setJobs(prev => prev.map(job => 
-          job.id === jobId ? { 
-            ...job, 
-            state: 'queued', 
-            attempts: 0, 
-            error: undefined 
-          } : job
-        ));
-      }
+      const rerunPayload = { originalJobId: parseInt(jobId) };
+      await studioOS.rerunJob(rerunPayload);
+      setJobs(prev => prev.map(job => 
+        job.id === jobId ? { 
+          ...job, 
+          state: 'queued', 
+          attempts: 0, 
+          error: undefined 
+        } : job
+      ));
     } catch (error) {
-      console.error('Failed to retry job:', error);
+      console.error('The job rerun failed due to Processing error. You may check job state and retry.', error);
     }
   };
 
@@ -197,7 +211,7 @@ export const JobManager: React.FC<JobManagerProps> = ({
   };
 
   const getJobIcon = (type: string) => {
-    const icons = {
+    const icons: Record<string, string> = {
       analyze: '📊',
       process: '⚙️',
       export: '📤',
@@ -272,7 +286,11 @@ export const JobManager: React.FC<JobManagerProps> = ({
           <div 
             key={job.id}
             className={`job-item ${job.state} ${selectedJob === job.id ? 'selected' : ''}`}
-            onClick={() => setSelectedJob(selectedJob === job.id ? null : job.id)}
+            onClick={() => {
+              const newSelection = selectedJob === job.id ? null : job.id;
+              setSelectedJob(newSelection);
+              onJobSelect?.(newSelection ? job : null);
+            }}
             style={{ '--state-color': STATE_COLORS[job.state] } as React.CSSProperties}
           >
             <div className="job-header">

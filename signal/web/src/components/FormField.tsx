@@ -3,9 +3,9 @@ import './FormField.css';
 
 interface FormFieldProps {
   label: string;
-  value: string | number;
-  onChange: (value: string | number) => void;
-  type?: 'text' | 'number' | 'select' | 'range';
+  value?: string | number;
+  onChange?: (value: string | number) => void;
+  type?: 'text' | 'number' | 'select' | 'range' | 'textarea';
   options?: Array<{ value: string | number; label: string }>;
   min?: number;
   max?: number;
@@ -16,6 +16,9 @@ interface FormFieldProps {
   disabled?: boolean;
   precision?: 'low' | 'medium' | 'high';
   className?: string;
+  children?: React.ReactNode;
+  required?: boolean;
+  helpText?: string;
 }
 
 /**
@@ -33,8 +36,8 @@ interface FormFieldProps {
  */
 export const FormField: React.FC<FormFieldProps> = ({
   label,
-  value,
-  onChange,
+  value = '',
+  onChange = () => {},
   type = 'text',
   options = [],
   min,
@@ -45,11 +48,14 @@ export const FormField: React.FC<FormFieldProps> = ({
   error,
   disabled = false,
   precision = 'medium',
-  className = ''
+  className = '',
+  children,
+  required = false,
+  helpText
 }) => {
   const fieldId = `field-${label.toLowerCase().replace(/\s+/g, '-')}`;
   
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const newValue = type === 'number' || type === 'range' 
       ? parseFloat(e.target.value) || 0
       : e.target.value;
@@ -102,6 +108,18 @@ export const FormField: React.FC<FormFieldProps> = ({
           </div>
         );
       
+      case 'textarea':
+        return (
+          <textarea
+            id={fieldId}
+            value={value}
+            onChange={handleChange}
+            disabled={disabled}
+            className={`form-input form-textarea ${getPrecisionClass()}`}
+            rows={4}
+          />
+        );
+      
       case 'number':
         return (
           <input
@@ -135,12 +153,12 @@ export const FormField: React.FC<FormFieldProps> = ({
       </div>
       
       <div className="field-input">
-        {renderInput()}
+        {children || renderInput()}
       </div>
       
-      {description && !error && (
+      {(description || helpText) && !error && (
         <div className="field-description">
-          {description}
+          {description || helpText}
         </div>
       )}
       

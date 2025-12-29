@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { FormField } from './FormField';
+import { studioOS } from '../../api/client';
+import type { AudioAnalysisResult } from '../../api/types';
 import './BatchUploader.css';
 
 interface UploadFile {
@@ -8,17 +9,11 @@ interface UploadFile {
   status: 'pending' | 'uploading' | 'processing' | 'completed' | 'error';
   progress: number;
   error?: string;
-  analysisResults?: {
-    duration: number;
-    bitrate: number;
-    sampleRate: number;
-    channels: number;
-    loudness: number;
-    problems: string[];
-  };
+  analysisResults?: AudioAnalysisResult;
 }
 
 interface BatchUploaderProps {
+  projectId?: number;
   onUploadComplete?: (files: UploadFile[]) => void;
   maxFileSize?: number;
   acceptedFormats?: string[];
@@ -26,6 +21,7 @@ interface BatchUploaderProps {
 }
 
 export const BatchUploader: React.FC<BatchUploaderProps> = ({
+  projectId: _projectId,
   onUploadComplete,
   maxFileSize = 200 * 1024 * 1024, // 200MB
   acceptedFormats = ['.wav', '.aiff', '.mp3', '.flac', '.m4a'],
@@ -81,19 +77,8 @@ export const BatchUploader: React.FC<BatchUploaderProps> = ({
         f.id === uploadFile.id ? { ...f, status: 'uploading' as const, progress: 0 } : f
       ));
 
-      const formData = new FormData();
-      formData.append('audio', uploadFile.file);
-
-      const response = await fetch('/api/upload-and-analyze', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
-
-      const analysisData = await response.json();
+      // Use the real StudioOS API client
+      const analysisData = await studioOS.uploadAndAnalyze(uploadFile.file);
 
       const updatedFile: UploadFile = {
         ...uploadFile,
@@ -109,11 +94,16 @@ export const BatchUploader: React.FC<BatchUploaderProps> = ({
       return updatedFile;
 
     } catch (error) {
+      // Format error per STUDIOOS_ERROR_RECOVERY_PLAYBOOK.md
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'The upload failed due to Ingestion error. You may retry the upload.';
+      
       const errorFile: UploadFile = {
         ...uploadFile,
         status: 'error',
         progress: 0,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: errorMessage
       };
 
       setFiles(prev => prev.map(f => 
@@ -284,7 +274,7 @@ export const BatchUploader: React.FC<BatchUploaderProps> = ({
                   <div className="file-warnings">
                     {file.analysisResults.problems.map((problem, idx) => (
                       <div key={idx} className="warning-item">
-                        ⚠️ {problem}
+                        ⚠️ {problem.description}
                       </div>
                     ))}
                   </div>

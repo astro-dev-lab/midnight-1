@@ -5,11 +5,11 @@
  * for editing asset metadata including ISRC codes and release data.
  */
 
-import React, { useState, useEffect } from 'react';
-import { FormField } from './FormField';
-import type { Asset } from '../../api';
+import React, { useState } from 'react';
+import { FormField } from '../FormField';
+import type { Asset } from '../../api/types';
 
-interface AssetMetadata {
+export interface AssetMetadata {
   title?: string;
   artist?: string;
   isrc?: string;
@@ -22,8 +22,14 @@ interface AssetMetadata {
   catalog?: string;
 }
 
+interface MetadataEditorAsset {
+  id: number;
+  name: string;
+  metadata?: Record<string, unknown>;
+}
+
 interface MetadataEditorProps {
-  asset: Asset;
+  asset: Asset | MetadataEditorAsset;
   onUpdate: (metadata: AssetMetadata) => Promise<void>;
   onCancel?: () => void;
   readOnly?: boolean;
@@ -46,16 +52,16 @@ export const MetadataEditor: React.FC<MetadataEditorProps> = ({
   className = ''
 }) => {
   const [metadata, setMetadata] = useState<AssetMetadata>({
-    title: asset.metadata?.title || '',
-    artist: asset.metadata?.artist || '',
-    isrc: asset.metadata?.isrc || '',
-    bpm: asset.metadata?.bpm || null,
-    key: asset.metadata?.key || '',
-    genre: asset.metadata?.genre || '',
-    notes: asset.metadata?.notes || '',
-    releaseDate: asset.metadata?.releaseDate || '',
-    label: asset.metadata?.label || '',
-    catalog: asset.metadata?.catalog || ''
+    title: (asset.metadata?.title as string) || '',
+    artist: (asset.metadata?.artist as string) || '',
+    isrc: (asset.metadata?.isrc as string) || '',
+    bpm: (asset.metadata?.bpm as number) || null,
+    key: (asset.metadata?.key as string) || '',
+    genre: (asset.metadata?.genre as string) || '',
+    notes: (asset.metadata?.notes as string) || '',
+    releaseDate: (asset.metadata?.releaseDate as string) || '',
+    label: (asset.metadata?.label as string) || '',
+    catalog: (asset.metadata?.catalog as string) || ''
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,7 +95,7 @@ export const MetadataEditor: React.FC<MetadataEditorProps> = ({
     const isrcError = validateISRC(metadata.isrc || '');
     if (isrcError) newErrors.isrc = isrcError;
     
-    const bpmError = validateBPM(metadata.bpm);
+    const bpmError = validateBPM(metadata.bpm ?? null);
     if (bpmError) newErrors.bpm = bpmError;
     
     if (Object.keys(newErrors).length > 0) {

@@ -1,12 +1,28 @@
 /**
  * Dashboard Two - Account & Usage View
  * 
- * Account settings and usage information for external users.
- * Per STUDIOOS_DASHBOARD_TWO_FUNCTIONAL_SPECS.md Section 4.5
+ * ============================================================================
+ * PERSONA: Operations / Reviewer (Any role)
+ * ============================================================================
+ * 
+ * PRIMARY QUESTION: "What's my account status and usage?"
+ * 
+ * SUCCESS CONDITION: User understands their role and usage stats
+ * 
+ * COMPONENT USAGE:
+ * - FormField: Display account information
+ * - (No core workflow components - this is account management)
+ * 
+ * RBAC:
+ * - Viewer: Can view own account info
+ * - Approver: Can view own account info + enhanced stats
+ * 
+ * ============================================================================
  */
 
 import { useEffect, useState } from 'react';
 import type { ExternalRole } from '../../types';
+import { FormField } from '../../components/core';
 
 interface AccountData {
   id: number;
@@ -64,34 +80,53 @@ export function AccountView({ onLogout }: AccountViewProps) {
 
   return (
     <div className="account-view">
-      <h2>Account & Usage</h2>
+      <header className="view-header">
+        <h2 className="view-title">Account & Usage</h2>
+        <p className="view-subtitle">Your account details and activity</p>
+      </header>
       
+      {/* Account Information — Component: FormField (read-only display) */}
       <section className="account-info">
-        <h3>Account Information</h3>
-        <dl>
-          <dt>Email</dt>
-          <dd>{account.email}</dd>
+        <h3 className="section-title">Account Information</h3>
+        
+        <div className="info-grid">
+          <FormField
+            label="Email"
+            value={account.email}
+            readOnly
+          />
           
-          <dt>Name</dt>
-          <dd>{account.name ?? 'Not set'}</dd>
+          <FormField
+            label="Name"
+            value={account.name ?? 'Not set'}
+            readOnly
+          />
           
-          <dt>Role</dt>
-          <dd>
-            <span className="role-badge">{account.externalRole}</span>
-            <p className="role-description">
-              {account.externalRole === 'APPROVER' 
-                ? 'You can view, download, and approve deliverables.'
-                : 'You can view shared projects and deliverables.'}
-            </p>
-          </dd>
+          <div className="role-field">
+            <label className="field-label">Role</label>
+            <div className="role-display">
+              <span className={`role-badge role-${account.externalRole.toLowerCase()}`}>
+                {account.externalRole}
+              </span>
+              <p className="role-description">
+                {account.externalRole === 'APPROVER' 
+                  ? 'You can view, download, and approve deliverables.'
+                  : 'You can view shared projects and deliverables.'}
+              </p>
+            </div>
+          </div>
           
-          <dt>Member Since</dt>
-          <dd>{new Date(account.createdAt).toLocaleDateString()}</dd>
-        </dl>
+          <FormField
+            label="Member Since"
+            value={new Date(account.createdAt).toLocaleDateString()}
+            readOnly
+          />
+        </div>
       </section>
       
+      {/* Usage Stats */}
       <section className="usage-stats">
-        <h3>Usage This Month</h3>
+        <h3 className="section-title">Usage This Month</h3>
         <div className="stats-grid">
           <div className="stat-card">
             <span className="stat-value">{account.usage.projectsAccessed}</span>
@@ -108,10 +143,11 @@ export function AccountView({ onLogout }: AccountViewProps) {
         </div>
       </section>
       
+      {/* Account Actions */}
       <section className="account-actions">
-        <h3>Actions</h3>
+        <h3 className="section-title">Actions</h3>
         <button 
-          className="logout-btn"
+          className="btn-logout"
           onClick={onLogout}
         >
           Sign Out

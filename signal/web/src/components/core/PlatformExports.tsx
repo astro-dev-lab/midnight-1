@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FormField } from '../FormField';
+import { studioOS } from '../../api/client';
 import './PlatformExports.css';
 
 interface Platform {
@@ -133,18 +134,8 @@ export const PlatformExports: React.FC<PlatformExportsProps> = ({
   });
   const [presetMode, setPresetMode] = useState<'streaming' | 'broadcast' | 'custom'>('streaming');
 
+  // Initialize export configs based on preset mode
   useEffect(() => {
-    // Initialize export configs based on preset mode
-    initializeConfigs();
-  }, [presetMode]);
-
-  useEffect(() => {
-    if (onExportConfigChange) {
-      onExportConfigChange(exportConfigs);
-    }
-  }, [exportConfigs, onExportConfigChange]);
-
-  const initializeConfigs = () => {
     const configs: ExportConfig[] = Object.values(PLATFORMS).map(platform => {
       let config: ExportConfig;
 
@@ -190,7 +181,13 @@ export const PlatformExports: React.FC<PlatformExportsProps> = ({
     });
 
     setExportConfigs(configs);
-  };
+  }, [presetMode, globalMetadata]);
+
+  useEffect(() => {
+    if (onExportConfigChange) {
+      onExportConfigChange(exportConfigs);
+    }
+  }, [exportConfigs, onExportConfigChange]);
 
   const updateConfig = (platformId: string, updates: Partial<ExportConfig>) => {
     setExportConfigs(prev => prev.map(config =>
@@ -251,7 +248,7 @@ export const PlatformExports: React.FC<PlatformExportsProps> = ({
     return issues;
   };
 
-  const handleStartExport = () => {
+  const handleStartExport = async () => {
     const enabledConfigs = exportConfigs.filter(c => c.enabled);
     
     if (enabledConfigs.length === 0) {
@@ -259,11 +256,41 @@ export const PlatformExports: React.FC<PlatformExportsProps> = ({
       return;
     }
 
-    const invalidConfigs = enabledConfigs.filter(c => validateConfig(c).length > 0);
-    if (invalidConfigs.length > 0) {
-      const platformNames = invalidConfigs.map(c => PLATFORMS[c.platformId].name).join(', ');
-      alert(`Please fix validation issues for: ${platformNames}`);
-      return;
+    // Validate with backend API
+    try {
+      const validationResults = await studioOS.validateExport(
+        enabledConfigs.map(c => ({
+          platformId: c.platformId,
+          assetId: selectedAssets[0] ? parseInt(selectedAssets[0]) : 0,
+          format: c.format,
+          bitDepth: c.bitDepth,
+          sampleRate: c.sampleRate,
+          loudnessTarget: c.loudnessTarget
+        }))
+      );
+      
+      const invalidResults = validationResults.filter(r => !r.valid);
+      if (invalidResults.length > 0) {
+        const errors = invalidResults.map(r => `${r.platformId}: ${r.errors.join(', ')}`).join('\n');
+        alert(`Validation failed:\n${errors}`);
+        return;
+      }
+    } catch (_error) {
+      // Fallback to local validation
+      const invalidConfigs = enabledConfigs.filter(c => validateConfig(c).length > 0);
+      if (invalidConfigs.length > 0) {
+        const platformNames = invalidConfigs.map(c => PLATFORMS[c.platformId].name).join(', ');
+        alert(`Please fix validation issues for: ${platformNames}`);
+        return;
+      }
+    }
+
+    // Start the export
+    try {
+      const result = await studioOS.startExport(enabledConfigs);
+      console.log('Export started:', result);
+    } catch (err) {
+      console.error('The export failed to start due to System error.', err);
     }
 
     if (onStartExport) {

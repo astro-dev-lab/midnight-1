@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FormField } from '../FormField';
+import { studioOS } from '../../api/client';
+import type { SearchResult as ApiSearchResult } from '../../api/types';
 import './SmartSearch.css';
 
 interface SearchFilter {
@@ -51,7 +53,7 @@ const SEARCH_FIELDS = [
   { value: 'tags', label: 'Tags', type: 'multiSelect' }
 ];
 
-const OPERATORS = {
+const OPERATORS: Record<string, Array<{ value: string; label: string }>> = {
   text: [
     { value: 'contains', label: 'Contains' },
     { value: 'equals', label: 'Equals' },
@@ -97,7 +99,7 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveSearchName, setSaveSearchName] = useState('');
 
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resultRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
@@ -127,98 +129,50 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [query, filters]);
+  }, [query, filters, maxResults]);
 
-  const performSearch = async () => {
+  const performSearch = useCallback(async () => {
     setIsSearching(true);
     setSelectedIndex(-1);
 
     try {
-      // Build search request
+      // Build search request matching API types
       const searchRequest = {
         query: query.trim(),
-        filters: filters.filter(f => f.value !== ''),
+        filters: filters
+          .filter(f => f.value !== '')
+          .map(f => ({
+            field: f.field,
+            operator: f.operator as 'equals' | 'contains' | 'greaterThan' | 'lessThan' | 'between',
+            value: f.value
+          })),
         maxResults,
         fuzzy: true
       };
 
-      const response = await fetch('/api/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(searchRequest)
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setResults(data.results || []);
-      } else {
-        console.error('Search failed:', response.statusText);
-        setResults([]);
-      }
+      // Use the real StudioOS API client
+      const response = await studioOS.search(searchRequest);
+      
+      // Map API results to component format
+      const mappedResults: SearchResult[] = response.results.map((r: ApiSearchResult) => ({
+        id: r.id,
+        type: r.type,
+        title: r.title,
+        description: r.description,
+        metadata: r.metadata as Record<string, unknown>,
+        score: r.score,
+        highlights: r.highlights || []
+      }));
+      
+      setResults(mappedResults);
     } catch (error) {
-      console.error('Search error:', error);
+      console.error('Search failed:', error);
+      // Graceful fallback - show empty results with no mock data
       setResults([]);
     } finally {
       setIsSearching(false);
     }
-  };
-
-  const generateMockResults = (): SearchResult[] => {
-    if (!query && filters.length === 0) return [];
-
-    const mockResults: SearchResult[] = [
-      {
-        id: 'asset_001',
-        type: 'asset',
-        title: 'Midnight Express - Final Mix',
-        description: 'Professional master for streaming distribution',
-        metadata: {
-          artist: 'The Midnight Runners',
-          genre: 'Electronic',
-          duration: '4:32',
-          loudness: '-14.1 LUFS',
-          sampleRate: '48kHz'
-        },
-        score: 0.95,
-        highlights: ['Midnight', 'Final']
-      },
-      {
-        id: 'project_002',
-        type: 'project',
-        title: 'Summer Album 2024',
-        description: 'Complete album project with 12 tracks',
-        metadata: {
-          status: 'In Progress',
-          tracks: 12,
-          totalDuration: '54:23',
-          created: '2024-01-15'
-        },
-        score: 0.78,
-        highlights: ['Album', '2024']
-      },
-      {
-        id: 'job_003',
-        type: 'job',
-        title: 'Loudness Analysis Job #1247',
-        description: 'EBU R128 analysis for broadcast delivery',
-        metadata: {
-          status: 'Completed',
-          type: 'Analysis',
-          duration: '2.3s',
-          confidence: '96%'
-        },
-        score: 0.65,
-        highlights: ['Analysis']
-      }
-    ];
-
-    return mockResults.filter(result => 
-      result.title.toLowerCase().includes(query.toLowerCase()) ||
-      result.description.toLowerCase().includes(query.toLowerCase())
-    );
-  };
+  }, [query, filters, maxResults]);
 
   const addFilter = () => {
     const newFilter: SearchFilter = {
@@ -488,7 +442,7 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
             {results.map((result, index) => (
               <div
                 key={result.id}
-                ref={el => resultRefs.current[index] = el}
+                ref={el => { resultRefs.current[index] = el; }}
                 className={`result-item ${selectedIndex === index ? 'selected' : ''}`}
                 onClick={() => handleSelectResult(result)}
               >

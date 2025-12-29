@@ -1,8 +1,9 @@
 .smart-search {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 2px;
+  border: var(--border-width-1) solid var(--color-border);
+  border-radius: var(--border-radius-lg);
   position: relative;
+  box-shadow: var(--shadow-sm);
 }
 
 .search-header {
@@ -10,6 +11,7 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-4);
+  background: var(--color-surface-subtle);
 }
 
 .search-input-wrapper {
@@ -22,18 +24,20 @@
 .search-input {
   width: 100%;
   padding: var(--space-3) var(--space-12) var(--space-3) var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: 2px;
-  background: var(--color-secondary);
-  font-family: var(--font-primary);
-  font-size: 1rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  border: var(--border-width-1) solid var(--color-border);
+  border-radius: var(--border-radius);
+  background: var(--color-surface);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+  transition: border-color var(--duration-200) var(--ease-out), 
+              box-shadow var(--duration-200) var(--ease-out);
 }
 
 .search-input:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-focus);
 }
 
 .search-actions {

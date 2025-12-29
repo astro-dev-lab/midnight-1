@@ -293,3 +293,109 @@ export interface ApiError {
   category?: ErrorCategory;
   recoveryActions?: string[];
 }
+
+// =============================================================================
+// Audio Analysis
+// =============================================================================
+
+export interface AudioAnalysisResult {
+  filename: string;
+  duration: number;
+  bitrate: number;
+  sampleRate: number;
+  channels: number;
+  loudness: number;
+  truePeak: number;
+  lra: number;
+  spectrum?: SpectrumData;
+  stereoWidth?: number;
+  phaseCorrelation?: number;
+  problems?: AudioProblem[];
+  timestamp: string;
+}
+
+export interface SpectrumData {
+  frequencies: number[];
+  magnitudes: number[];
+  peaks?: { frequency: number; magnitude: number }[];
+}
+
+export interface AudioProblem {
+  type: 'clipping' | 'dc_offset' | 'low_end_buildup' | 'phase_issues' | 'silence';
+  severity: 'low' | 'medium' | 'high';
+  description: string;
+  timestamp?: number;
+}
+
+// =============================================================================
+// Search
+// =============================================================================
+
+export interface SearchRequest {
+  query: string;
+  filters?: SearchFilter[];
+  maxResults?: number;
+  fuzzy?: boolean;
+  facets?: boolean;
+}
+
+export interface SearchFilter {
+  field: string;
+  operator: 'equals' | 'contains' | 'greaterThan' | 'lessThan' | 'between';
+  value: unknown;
+}
+
+export interface SearchResponse {
+  query: string;
+  total: number;
+  maxResults: number;
+  results: SearchResult[];
+  facets?: SearchFacets;
+  searchTime: number;
+}
+
+export interface SearchResult {
+  id: string;
+  type: 'asset' | 'project' | 'job';
+  title: string;
+  description: string;
+  metadata: Record<string, unknown>;
+  score: number;
+  highlights?: string[];
+}
+
+export interface SearchFacets {
+  types: { value: string; count: number }[];
+  genres?: { value: string; count: number }[];
+  years?: { value: number; count: number }[];
+}
+
+// =============================================================================
+// Platform Exports
+// =============================================================================
+
+export interface ExportConfig {
+  platformId: string;
+  format: string;
+  bitDepth: number;
+  sampleRate: number;
+  loudnessTarget: number;
+  metadata: Record<string, string>;
+  enabled: boolean;
+}
+
+export interface ExportValidationRequest {
+  platformId: string;
+  assetId: number;
+  format: string;
+  bitDepth: number;
+  sampleRate: number;
+  loudnessTarget: number;
+}
+
+export interface ExportValidationResult {
+  platformId: string;
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}

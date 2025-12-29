@@ -1,17 +1,40 @@
 /**
  * Dashboard Two - Review & Approvals View
  * 
- * External approval workflow for deliverables.
- * Per STUDIOOS_DASHBOARD_TWO_FUNCTIONAL_SPECS.md Section 4.3
+ * ============================================================================
+ * PERSONA: Operations / Reviewer (Approver role required)
+ * ============================================================================
+ * 
+ * PRIMARY QUESTION: "What needs my approval decision?"
+ * 
+ * SUCCESS CONDITION: User approves/rejects with confidence based on reports
+ * 
+ * COMPONENT USAGE:
+ * - ProcessingReport: Show processing details for informed decisions
+ * - AudioComparison: Before/after comparison for review
+ * - AudioVisualization: Visual audio analysis
+ * 
+ * RBAC:
+ * - Viewer: Can view pending items only
+ * - Approver: Can approve, reject, and add comments
+ * 
+ * ============================================================================
  */
 
 import { useEffect, useState } from 'react';
 import type { Asset, ExternalRole, Approval } from '../../types';
+import { ProcessingReport, AudioComparison, AudioVisualization } from '../../components/core';
 
 interface PendingReview {
   asset: Asset;
   requestedAt: string;
   requestedBy: string;
+  report?: {
+    type: string;
+    summary: string;
+    confidence: string;
+    changesApplied: string;
+  };
 }
 
 interface ReviewApprovalsViewProps {
@@ -24,7 +47,7 @@ export function ReviewApprovalsView({ role }: ReviewApprovalsViewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [comment, setComment] = useState('');
-  const [selectedAsset, setSelectedAsset] = useState<number | null>(null);
+  const [selectedItem, setSelectedItem] = useState<PendingReview | null>(null);
 
   useEffect(() => {
     fetchReviews();
@@ -85,7 +108,7 @@ export function ReviewApprovalsView({ role }: ReviewApprovalsViewProps) {
       }
 
       setComment('');
-      setSelectedAsset(null);
+      setSelectedItem(null);
       fetchReviews();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Approval failed');
@@ -102,7 +125,10 @@ export function ReviewApprovalsView({ role }: ReviewApprovalsViewProps) {
 
   return (
     <div className="review-approvals-view">
-      <h2>Review & Approvals</h2>
+      <header className="view-header">
+        <h2 className="view-title">Review & Approvals</h2>
+        <p className="view-subtitle">Pending approval decisions and history</p>
+      </header>
       
       {role !== 'APPROVER' && (
         <div className="role-notice-banner">
@@ -110,64 +136,125 @@ export function ReviewApprovalsView({ role }: ReviewApprovalsViewProps) {
         </div>
       )}
       
+      {/* Pending Reviews Queue */}
       <section className="pending-reviews">
-        <h3>Pending Review ({pending.length})</h3>
+        <h3 className="section-title">Pending Review ({pending.length})</h3>
         
         {pending.length === 0 ? (
-          <p>No items awaiting your review.</p>
+          <div className="empty-state">
+            <p>No items awaiting your review.</p>
+          </div>
         ) : (
           <div className="review-cards">
             {pending.map(item => (
-              <div key={item.asset.id} className="review-card">
-                <h4>{item.asset.name}</h4>
-                <p>Category: {item.asset.category}</p>
-                <p>Requested: {new Date(item.requestedAt).toLocaleString()}</p>
-                <p>By: {item.requestedBy}</p>
+              <div 
+                key={item.asset.id} 
+                className={`review-card ${selectedItem?.asset.id === item.asset.id ? 'selected' : ''}`}
+              >
+                <div className="card-header">
+                  <h4 className="asset-name">{item.asset.name}</h4>
+                  <span className="category-badge">{item.asset.category}</span>
+                </div>
+                
+                <div className="card-meta">
+                  <p>Requested: {new Date(item.requestedAt).toLocaleString()}</p>
+                  <p>By: {item.requestedBy}</p>
+                </div>
                 
                 {role === 'APPROVER' && (
-                  <div className="approval-actions">
-                    {selectedAsset === item.asset.id ? (
-                      <>
-                        <textarea
-                          value={comment}
-                          onChange={e => setComment(e.target.value)}
-                          placeholder="Optional comment..."
-                          rows={2}
-                        />
-                        <div className="action-buttons">
-                          <button 
-                            className="approve-btn"
-                            onClick={() => handleApproval(item.asset.id, 'APPROVE')}
-                          >
-                            Approve
-                          </button>
-                          <button 
-                            className="reject-btn"
-                            onClick={() => handleApproval(item.asset.id, 'REJECT')}
-                          >
-                            Reject
-                          </button>
-                          <button onClick={() => setSelectedAsset(null)}>Cancel</button>
-                        </div>
-                      </>
-                    ) : (
-                      <button onClick={() => setSelectedAsset(item.asset.id)}>
-                        Review
-                      </button>
-                    )}
-                  </div>
+                  <button 
+                    className="btn-review"
+                    onClick={() => setSelectedItem(item)}
+                  >
+                    Review Details
+                  </button>
                 )}
               </div>
             ))}
           </div>
         )}
       </section>
+
+      {/* Review Detail Panel — Components: ProcessingReport, AudioComparison, AudioVisualization */}
+      {selectedItem && (
+        <section className="review-detail-panel">
+          <div className="panel-header">
+            <h3 className="panel-title">Review: {selectedItem.asset.name}</h3>
+            <button className="btn-close" onClick={() => setSelectedItem(null)}>×</button>
+          </div>
+
+          {/* Audio Analysis — Component: AudioVisualization */}
+          <div className="analysis-section">
+            <h4 className="section-subtitle">Audio Analysis</h4>
+            <div className="visualization-grid">
+              <AudioVisualization type="waveform" height={100} showLabels />
+              <AudioVisualization type="spectrum" height={100} showLabels />
+            </div>
+          </div>
+
+          {/* Processing Report — Component: ProcessingReport */}
+          <div className="report-section">
+            <h4 className="section-subtitle">Processing Report</h4>
+            <ProcessingReport 
+              report={selectedItem.report || null}
+              isLive={false}
+            />
+          </div>
+
+          {/* Audio Comparison — Component: AudioComparison */}
+          <div className="comparison-section">
+            <h4 className="section-subtitle">Before / After</h4>
+            <AudioComparison 
+              inputAsset={selectedItem.asset.parent || null}
+              outputAsset={selectedItem.asset}
+            />
+          </div>
+
+          {/* Approval Actions */}
+          {role === 'APPROVER' && (
+            <div className="approval-form">
+              <label className="form-label">Comment (optional)</label>
+              <textarea
+                value={comment}
+                onChange={e => setComment(e.target.value)}
+                placeholder="Add notes about your decision..."
+                rows={3}
+                className="approval-textarea"
+              />
+              
+              <div className="approval-actions">
+                <button 
+                  className="btn-approve"
+                  onClick={() => handleApproval(selectedItem.asset.id, 'APPROVE')}
+                >
+                  Approve
+                </button>
+                <button 
+                  className="btn-reject"
+                  onClick={() => handleApproval(selectedItem.asset.id, 'REJECT')}
+                >
+                  Reject
+                </button>
+                <button 
+                  className="btn-cancel"
+                  onClick={() => setSelectedItem(null)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
       
+      {/* Approval History */}
       <section className="approval-history">
-        <h3>Your Approval History</h3>
+        <h3 className="section-title">Your Approval History</h3>
         
         {history.length === 0 ? (
-          <p>No approval history.</p>
+          <div className="empty-state">
+            <p>No approval history.</p>
+          </div>
         ) : (
           <table className="history-table">
             <thead>
@@ -183,7 +270,7 @@ export function ReviewApprovalsView({ role }: ReviewApprovalsViewProps) {
                 <tr key={approval.id}>
                   <td>{approval.asset?.name ?? 'Unknown'}</td>
                   <td>
-                    <span className={`decision-${approval.decision.toLowerCase()}`}>
+                    <span className={`decision-badge decision-${approval.decision.toLowerCase()}`}>
                       {approval.decision}
                     </span>
                   </td>

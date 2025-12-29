@@ -19,6 +19,12 @@ function validateRequest(req, res, next) {
  * Generic error handler middleware
  */
 function errorHandler(err, req, res, next) {
+  // Ensure CORS headers are always set, even for errors
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE');
+  res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  
   const status = err.status || 500;
   const message = err.message || 'Internal Server Error';
   const response = {

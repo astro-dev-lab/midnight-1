@@ -1,12 +1,25 @@
 /**
  * Dashboard One - Assets View
  * 
- * Displays and manages project assets with lineage tracking.
- * Per STUDIOOS_FUNCTIONAL_SPECS.md Section 4.2
+ * ============================================================================
+ * PERSONA: Artist/Producer hybrid
+ * ============================================================================
+ * 
+ * PRIMARY QUESTION: "What files do I have and what's their status?"
+ * 
+ * SUCCESS CONDITION: User can find and inspect any asset in < 10 seconds
+ * 
+ * COMPONENT USAGE:
+ * - SmartSearch: Find assets by name, metadata, or type
+ * - MetadataEditor: View/edit asset metadata
+ * 
+ * ============================================================================
  */
 
-import { useEffect, useState } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useProjects, useAssets } from '../../api';
+import { SmartSearch, MetadataEditor } from '../../components/core';
+import type { AssetMetadata } from '../../components/core';
 import type { Asset } from '../../api';
 
 interface AssetsViewProps {
@@ -15,16 +28,16 @@ interface AssetsViewProps {
   onNavigate: (view: string, id?: number) => void;
 }
 
-export function AssetsView({ projectId: _projectId, role: _role, onNavigate }: AssetsViewProps) {
+export function AssetsView({ projectId, role: _role, onNavigate }: AssetsViewProps) {
   const { data: projectsResponse, loading: loadingProjects } = useProjects();
-  const projects = projectsResponse?.data || [];
+  const projects = useMemo(() => projectsResponse?.data || [], [projectsResponse]);
   
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(projectId || null);
   const [categoryFilter, setCategoryFilter] = useState<string>('');
-  const [error, setError] = useState('');
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
 
   // Fetch assets for selected project
-  const { data: assetsResponse, loading: loadingAssets } = useAssets(selectedProjectId);
+  const { data: assetsResponse, loading: loadingAssets, refetch: refetchAssets } = useAssets(selectedProjectId);
   const allAssets = assetsResponse?.data || [];
   
   // Apply category filter client-side
@@ -50,11 +63,24 @@ export function AssetsView({ projectId: _projectId, role: _role, onNavigate }: A
     }
   };
 
-  const formatSize = (bytes: string) => {
-    const num = parseInt(bytes);
+  const formatSize = (bytes: string | number) => {
+    const num = typeof bytes === 'number' ? bytes : parseInt(bytes);
     if (num < 1024) return `${num} B`;
     if (num < 1024 * 1024) return `${(num / 1024).toFixed(1)} KB`;
     return `${(num / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const handleSearchSelect = (result: { id: string; title: string }) => {
+    const asset = allAssets.find((a: Asset) => String(a.id) === result.id);
+    if (asset) {
+      setSelectedAsset(asset);
+    }
+  };
+
+  const handleMetadataUpdate = async (metadata: AssetMetadata) => {
+    // In real implementation, this would call the API
+    console.log('Updating metadata:', metadata);
+    refetchAssets();
   };
 
   if (loading && projects.length === 0) {
@@ -63,13 +89,28 @@ export function AssetsView({ projectId: _projectId, role: _role, onNavigate }: A
 
   return (
     <div className="assets-view">
-      <h2>Assets</h2>
+      <header className="view-header">
+        <h2 className="view-title">Assets</h2>
+        <p className="view-subtitle">Browse and manage your audio files</p>
+      </header>
 
-      {/* Project Selector */}
-      <div className="controls">
+      {/* Search — Component: SmartSearch */}
+      <section className="search-section">
+        <SmartSearch
+          onSelect={handleSearchSelect}
+          placeholder="Search assets by name, artist, or metadata..."
+        />
+      </section>
+
+      {/* Controls */}
+      <section className="controls-section">
         <select 
           value={selectedProjectId || ''} 
-          onChange={(e) => setSelectedProjectId(parseInt(e.target.value))}
+          onChange={(e) => {
+            setSelectedProjectId(parseInt(e.target.value));
+            setSelectedAsset(null);
+          }}
+          className="project-select"
         >
           <option value="">Select Project</option>
           {projects.map(p => (
@@ -80,6 +121,7 @@ export function AssetsView({ projectId: _projectId, role: _role, onNavigate }: A
         <select 
           value={categoryFilter} 
           onChange={(e) => setCategoryFilter(e.target.value)}
+          className="category-filter"
         >
           <option value="">All Categories</option>
           <option value="RAW">Raw</option>
@@ -87,67 +129,80 @@ export function AssetsView({ projectId: _projectId, role: _role, onNavigate }: A
           <option value="FINAL">Final</option>
         </select>
 
-        <button onClick={() => onNavigate('create')}>Upload Asset</button>
-      </div>
+        <button onClick={() => onNavigate('create')} className="btn-upload">
+          Upload Asset
+        </button>
+      </section>
 
-      {error && <div className="view-error">{error}</div>}
-
-      {/* Asset List */}
-      <div className="asset-list">
-        {assets.length === 0 ? (
-          <p>No assets found. Upload assets to get started.</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Category</th>
-                <th>Type</th>
-                <th>Size</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {assets.map(asset => (
-                <tr key={asset.id}>
-                  <td>{asset.name}</td>
-                  <td>
+      <div className="assets-layout">
+        {/* Asset List */}
+        <section className="asset-list-section">
+          <h3 className="section-title">Assets ({assets.length})</h3>
+          {assets.length === 0 ? (
+            <p className="empty-message">No assets found. Upload assets to get started.</p>
+          ) : (
+            <div className="asset-grid">
+              {assets.map((asset: Asset) => (
+                <button
+                  key={asset.id}
+                  className={`asset-card ${selectedAsset?.id === asset.id ? 'selected' : ''}`}
+                  onClick={() => setSelectedAsset(asset)}
+                >
+                  <span className="asset-icon">🎵</span>
+                  <div className="asset-info">
+                    <span className="asset-name">{asset.name}</span>
                     <span 
                       className="category-badge" 
                       style={{ backgroundColor: getCategoryColor(asset.category) }}
                     >
                       {asset.category}
                     </span>
-                  </td>
-                  <td>{asset.mimeType}</td>
-                  <td>{formatSize(asset.sizeBytes)}</td>
-                  <td>{new Date(asset.createdAt).toLocaleDateString()}</td>
-                  <td>
-                    <button onClick={() => onNavigate('review')}>Review</button>
-                    {asset.category === 'DERIVED' && (
-                      <button onClick={() => onNavigate('review')}>Approve</button>
-                    )}
-                  </td>
-                </tr>
+                    <span className="asset-meta">
+                      {asset.mimeType} • {formatSize(asset.sizeBytes)}
+                    </span>
+                  </div>
+                </button>
               ))}
-            </tbody>
-          </table>
+            </div>
+          )}
+        </section>
+
+        {/* Metadata Editor — Component: MetadataEditor */}
+        {selectedAsset && (
+          <section className="metadata-section">
+            <h3 className="section-title">Metadata</h3>
+            <MetadataEditor
+              asset={selectedAsset}
+              onUpdate={handleMetadataUpdate}
+              onCancel={() => setSelectedAsset(null)}
+            />
+          </section>
         )}
       </div>
 
       {/* Lineage Info */}
-      <div className="lineage-info">
-        <h3>Asset Lineage</h3>
+      <section className="lineage-info">
+        <h3 className="section-title">Asset Lineage</h3>
         <p>
           Assets flow through categories: <strong>Raw → Derived → Final</strong>
         </p>
-        <ul>
-          <li><strong>Raw:</strong> Original uploaded assets</li>
-          <li><strong>Derived:</strong> Outputs from processing jobs</li>
-          <li><strong>Final:</strong> Approved assets ready for delivery</li>
-        </ul>
-      </div>
+        <div className="lineage-stages">
+          <div className="stage">
+            <span className="stage-badge raw">RAW</span>
+            <span>Original uploaded assets</span>
+          </div>
+          <span className="arrow">→</span>
+          <div className="stage">
+            <span className="stage-badge derived">DERIVED</span>
+            <span>Outputs from processing</span>
+          </div>
+          <span className="arrow">→</span>
+          <div className="stage">
+            <span className="stage-badge final">FINAL</span>
+            <span>Approved for delivery</span>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

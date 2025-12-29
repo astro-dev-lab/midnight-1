@@ -26,6 +26,12 @@ import type {
   Preset,
   PaginatedResponse,
   ApiError,
+  AudioAnalysisResult,
+  SearchRequest,
+  SearchResponse,
+  ExportValidationRequest,
+  ExportValidationResult,
+  ExportConfig,
 } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -272,6 +278,57 @@ class StudioOSClient {
 
   async approveAsset(assetId: number, payload: CreateApprovalPayload): Promise<Approval> {
     const response = await this.client.post<Approval>(`/api/assets/${assetId}/approve`, payload);
+    return response.data;
+  }
+
+  // ===========================================================================
+  // Metadata
+  // ===========================================================================
+
+  async updateAssetMetadata(assetId: number, metadata: Record<string, unknown>): Promise<Asset> {
+    const response = await this.client.patch<Asset>(`/api/assets/${assetId}/metadata`, { metadata });
+    return response.data;
+  }
+
+  // ===========================================================================
+  // Audio Analysis
+  // ===========================================================================
+
+  async uploadAndAnalyze(file: File): Promise<AudioAnalysisResult> {
+    const formData = new FormData();
+    formData.append('audio', file);
+    
+    const response = await this.client.post<AudioAnalysisResult>('/api/audio/upload-and-analyze', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  // ===========================================================================
+  // Search
+  // ===========================================================================
+
+  async search(params: SearchRequest): Promise<SearchResponse> {
+    const response = await this.client.post<SearchResponse>('/api/search', params);
+    return response.data;
+  }
+
+  async getSearchSuggestions(query: string, limit = 10): Promise<{ suggestions: string[] }> {
+    const response = await this.client.get<{ suggestions: string[] }>(`/api/search/suggestions?q=${encodeURIComponent(query)}&limit=${limit}`);
+    return response.data;
+  }
+
+  // ===========================================================================
+  // Platform Exports
+  // ===========================================================================
+
+  async validateExport(configs: ExportValidationRequest[]): Promise<ExportValidationResult[]> {
+    const response = await this.client.post<{ results: ExportValidationResult[] }>('/api/exports/validate', { configs });
+    return response.data.results;
+  }
+
+  async startExport(configs: ExportConfig[]): Promise<{ exportId: string; status: string }> {
+    const response = await this.client.post<{ exportId: string; status: string }>('/api/exports/start', { configs });
     return response.data;
   }
 

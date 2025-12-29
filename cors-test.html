@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+</head>
+<body>
+    <h2>API Integration Test</h2>
+    <button id="test-health">Test Health Endpoint</button>
+    <button id="test-login">Test Login</button>
+    <div id="results" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;"></div>
+    
+    <script>
+        const API_URL = 'https://friendly-carnival-g4wr774qg774fwgp6-3000.app.github.dev';
+        const resultsDiv = document.getElementById('results');
+        
+        function showResult(message, isError = false) {
+            const p = document.createElement('p');
+            p.style.color = isError ? 'red' : 'green';
+            p.textContent = new Date().toISOString() + ': ' + message;
+            resultsDiv.appendChild(p);
+        }
+        
+        document.getElementById('test-health').addEventListener('click', async () => {
+            try {
+                const response = await fetch(API_URL + '/health');
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult('Health check successful: ' + JSON.stringify(data));
+                } else {
+                    showResult('Health check failed: ' + response.status, true);
+                }
+            } catch (error) {
+                showResult('Health check error: ' + error.message, true);
+            }
+        });
+        
+        document.getElementById('test-login').addEventListener('click', async () => {
+            try {
+                const response = await fetch(API_URL + '/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'test@example.com',
+                        password: 'password123'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult('Login successful: ' + JSON.stringify(data));
+                } else {
+                    const errorData = await response.text();
+                    showResult('Login failed (' + response.status + '): ' + errorData, true);
+                }
+            } catch (error) {
+                showResult('Login error: ' + error.message, true);
+            }
+        });
+    </script>
+</body>
+</html>

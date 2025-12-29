@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { FormField } from './FormField';
+import { FormField } from '../FormField';
+import { studioOS } from '../../api/client';
+import type { Preset as ApiPreset } from '../../api/types';
 import './QualityPresets.css';
 
 interface QualityConfig {
@@ -193,6 +195,24 @@ export const QualityPresets: React.FC<QualityPresetsProps> = ({
   const [activePreset, setActivePreset] = useState(selectedPreset);
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [config, setConfig] = useState<Partial<QualityConfig>>(customConfig || {});
+  const [apiPresets, setApiPresets] = useState<ApiPreset[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load presets from API
+  useEffect(() => {
+    const loadPresets = async () => {
+      try {
+        const presets = await studioOS.getPresets();
+        setApiPresets(presets);
+      } catch (error) {
+        console.error('Failed to load presets from API, using built-in presets.', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadPresets();
+  }, []);
 
   useEffect(() => {
     if (selectedPreset && BUILTIN_PRESETS[selectedPreset]) {

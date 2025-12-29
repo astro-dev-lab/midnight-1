@@ -73,7 +73,7 @@ export function useAssets(projectId: number | null): UseQueryResult<PaginatedRes
   return useQuery(
     async () => {
       if (!projectId || projectId <= 0) {
-        return { data: [], total: 0, limit: 50, offset: 0 };
+        return { data: [], count: 0, total: 0, limit: 50, offset: 0 };
       }
       return studioOS.getAssets(projectId);
     },
@@ -113,7 +113,7 @@ export function useJobs(projectId: number | null, state?: string): UseQueryResul
   return useQuery(
     async () => {
       if (!projectId || projectId <= 0) {
-        return { data: [], total: 0, limit: 50, offset: 0 };
+        return { data: [], count: 0, total: 0, limit: 50, offset: 0 };
       }
       return studioOS.getJobs(projectId, state);
     },

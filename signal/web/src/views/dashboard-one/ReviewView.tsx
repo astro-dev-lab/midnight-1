@@ -1,15 +1,29 @@
 /**
  * Dashboard One - Review View
  * 
- * Review and approve derived assets with confidence indicators.
- * Per STUDIOOS_FUNCTIONAL_SPECS.md Section 4.5
+ * ============================================================================
+ * PERSONA: Independent Rap Artist / Producer
+ * ============================================================================
+ * 
+ * PRIMARY QUESTION: "Does this sound right? Can I trust it?"
+ * 
+ * SUCCESS CONDITION: User approves with confidence based on report, not speculation
+ * 
+ * COMPONENT USAGE:
+ * - ProcessingReport: Canonical explanation of what happened (isLive=false)
+ * - AudioComparison: Before/after comparison with visual waveforms
+ * 
+ * TRANSPARENCY:
+ * - Grounded in processing reports, never speculation
+ * - Explains what and why, never how to tweak
+ * 
+ * ============================================================================
  */
 
-import { useEffect, useState } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useProjects, useAssets, studioOS } from '../../api';
-import type { Asset, Report } from '../../api';
-import { AudioComparison } from '../../components';
-import '../../components/AudioComparison.css';
+import type { Asset } from '../../api';
+import { AudioComparison, ProcessingReport } from '../../components/core';
 
 interface ReviewViewProps {
   projectId?: number | null;
@@ -17,26 +31,12 @@ interface ReviewViewProps {
   onNavigate: (view: string, id?: number) => void;
 }
 
-// Confidence level thresholds
-const CONFIDENCE_LEVELS = {
-  HIGH: { min: 0.9, color: '#4ade80', label: 'High' },
-  MEDIUM: { min: 0.75, color: '#fbbf24', label: 'Medium' },
-  LOW: { min: 0, color: '#f87171', label: 'Low' }
-};
-
-function getConfidenceLevel(confidence: number) {
-  if (confidence >= CONFIDENCE_LEVELS.HIGH.min) return CONFIDENCE_LEVELS.HIGH;
-  if (confidence >= CONFIDENCE_LEVELS.MEDIUM.min) return CONFIDENCE_LEVELS.MEDIUM;
-  return CONFIDENCE_LEVELS.LOW;
-}
-
-export function ReviewView({ projectId: _projectId, role, onNavigate }: ReviewViewProps) {
+export function ReviewView({ projectId, role, onNavigate }: ReviewViewProps) {
   const { data: projectsResponse, loading: loadingProjects } = useProjects();
-  const projects = projectsResponse?.data || [];
+  const projects = useMemo(() => projectsResponse?.data || [], [projectsResponse]);
   
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(projectId || null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
-  const [assetReport, setAssetReport] = useState<Report | null>(null);
   const [approvalComment, setApprovalComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -48,7 +48,7 @@ export function ReviewView({ projectId: _projectId, role, onNavigate }: ReviewVi
   // Only show Derived assets (those needing approval)
   const assets = allAssets.filter((a: Asset) => a.category === 'DERIVED');
 
-  // Role-based approval access
+  // Role-based approval access (Basic cannot approve)
   const canApprove = role === 'STANDARD' || role === 'ADVANCED';
 
   // Select first project by default
@@ -58,23 +58,8 @@ export function ReviewView({ projectId: _projectId, role, onNavigate }: ReviewVi
     }
   }, [projects, selectedProjectId]);
 
-  // Load report when asset selected
-  const loadAssetReport = async (asset: Asset) => {
-    if (asset.outputJobId) {
-      try {
-        const report = await studioOS.getJobReport(asset.outputJobId);
-        setAssetReport(report);
-      } catch {
-        setAssetReport(null);
-      }
-    } else {
-      setAssetReport(null);
-    }
-  };
-
   const selectAsset = (asset: Asset) => {
     setSelectedAsset(asset);
-    loadAssetReport(asset);
   };
 
   const handleApprove = async () => {
@@ -92,7 +77,6 @@ export function ReviewView({ projectId: _projectId, role, onNavigate }: ReviewVi
 
       setSuccess(`Asset "${selectedAsset.name}" approved and promoted to Final.`);
       setSelectedAsset(null);
-      setAssetReport(null);
       setApprovalComment('');
       refetchAssets();
     } catch (err: unknown) {
@@ -110,12 +94,16 @@ export function ReviewView({ projectId: _projectId, role, onNavigate }: ReviewVi
 
   return (
     <div className="review-view">
-      <h2>Review</h2>
+      <header className="view-header">
+        <h2 className="view-title">Review</h2>
+        <p className="view-subtitle">Evaluate derived assets and approve for delivery</p>
+      </header>
 
       {/* Project Selection */}
-      <div className="form-group">
-        <label>Project</label>
+      <section className="project-section">
+        <label className="section-label">Project</label>
         <select 
+          className="project-select"
           value={selectedProjectId || ''} 
           onChange={(e) => {
             setSelectedProjectId(parseInt(e.target.value));
@@ -127,94 +115,111 @@ export function ReviewView({ projectId: _projectId, role, onNavigate }: ReviewVi
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
-      </div>
+      </section>
 
       {error && <div className="view-error">{error}</div>}
       {success && <div className="view-success">{success}</div>}
 
       {/* Pending Review List */}
-      <div className="review-list">
-        <h3>Pending Review ({assets.length}) {loadingAssets && '(loading...)'}</h3>
+      <section className="review-list">
+        <h3 className="section-title">
+          Pending Review ({assets.length})
+          {loadingAssets && <span className="loading-badge">Loading...</span>}
+        </h3>
+        
         {assets.length === 0 ? (
-          <p>No derived assets pending review.</p>
+          <div className="empty-state">
+            <p>No derived assets pending review.</p>
+            <button className="btn-secondary" onClick={() => onNavigate('transform')}>
+              Transform assets to create derived outputs →
+            </button>
+          </div>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {assets.map(asset => (
-                <tr key={asset.id} className={selectedAsset?.id === asset.id ? 'selected' : ''}>
-                  <td>{asset.name}</td>
-                  <td>{new Date(asset.createdAt).toLocaleDateString()}</td>
-                  <td>
-                    <button onClick={() => selectAsset(asset)}>
-                      Review
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="review-grid">
+            {assets.map(asset => (
+              <div 
+                key={asset.id} 
+                className={`review-card ${selectedAsset?.id === asset.id ? 'selected' : ''}`}
+                onClick={() => selectAsset(asset)}
+              >
+                <div className="card-header">
+                  <span className="asset-name">{asset.name}</span>
+                  <span className="category-badge">DERIVED</span>
+                </div>
+                <div className="card-meta">
+                  <span>Created: {new Date(asset.createdAt).toLocaleDateString()}</span>
+                </div>
+                <button className="btn-review" onClick={() => selectAsset(asset)}>
+                  Review
+                </button>
+              </div>
+            ))}
+          </div>
         )}
-      </div>
+      </section>
 
-      {/* Review Panel */}
+      {/* Review Panel - Component: ProcessingReport + AudioComparison */}
       {selectedAsset && (
-        <div className="review-panel">
-          <h3>Review: {selectedAsset.name}</h3>
+        <section className="review-panel">
+          <h3 className="panel-title">Review: {selectedAsset.name}</h3>
           
+          {/* Asset Details */}
           <div className="asset-details">
-            <p><strong>Category:</strong> {selectedAsset.category}</p>
-            <p><strong>Type:</strong> {selectedAsset.mimeType}</p>
-            <p><strong>Created:</strong> {new Date(selectedAsset.createdAt).toLocaleString()}</p>
+            <div className="detail-row">
+              <span className="label">Category:</span>
+              <span className="value">{selectedAsset.category}</span>
+            </div>
+            <div className="detail-row">
+              <span className="label">Type:</span>
+              <span className="value">{selectedAsset.mimeType}</span>
+            </div>
+            <div className="detail-row">
+              <span className="label">Created:</span>
+              <span className="value">{new Date(selectedAsset.createdAt).toLocaleString()}</span>
+            </div>
           </div>
 
-          {/* Confidence Indicator */}
-          {assetReport && (
-            <div className="confidence-section">
-              <h4>Processing Confidence</h4>
-              <ConfidenceIndicator confidence={assetReport.confidence} />
-              {assetReport.summary && (
-                <p className="report-summary">{assetReport.summary}</p>
-              )}
-            </div>
-          )}
+          {/* Processing Report — Component: ProcessingReport */}
+          <div className="report-section">
+            <h4 className="section-subtitle">Processing Report</h4>
+            <ProcessingReport 
+              jobId={selectedAsset.outputJobId || undefined}
+              isLive={false}
+            />
+          </div>
 
-          {/* Audio Comparison - Before/After */}
-          <AudioComparison 
-            inputAsset={selectedAsset.parent || null}
-            outputAsset={selectedAsset}
-          />
+          {/* Audio Comparison — Component: AudioComparison */}
+          <div className="comparison-section">
+            <h4 className="section-subtitle">Before / After Comparison</h4>
+            <AudioComparison 
+              inputAsset={selectedAsset.parent || null}
+              outputAsset={selectedAsset}
+            />
+          </div>
 
           {/* Approval Form */}
           {canApprove ? (
             <div className="approval-form">
-              <div className="form-group">
-                <label>Approval Comment (optional)</label>
-                <textarea
-                  value={approvalComment}
-                  onChange={(e) => setApprovalComment(e.target.value)}
-                  placeholder="Add notes about this approval..."
-                  rows={3}
-                />
-              </div>
+              <label className="form-label">Approval Comment (optional)</label>
+              <textarea
+                value={approvalComment}
+                onChange={(e) => setApprovalComment(e.target.value)}
+                placeholder="Add notes about this approval..."
+                rows={3}
+                className="approval-textarea"
+              />
 
               <div className="approval-actions">
                 <button 
                   onClick={handleApprove} 
                   disabled={submitting}
-                  className="approve-btn"
+                  className="btn-approve"
                 >
                   {submitting ? 'Approving...' : 'Approve (Promote to Final)'}
                 </button>
                 <button 
                   onClick={() => setSelectedAsset(null)}
-                  className="cancel-btn"
+                  className="btn-cancel"
                 >
                   Cancel
                 </button>
@@ -225,54 +230,15 @@ export function ReviewView({ projectId: _projectId, role, onNavigate }: ReviewVi
               Basic role: You can review assets but cannot approve. Contact a Standard or Advanced user for approval.
             </p>
           )}
-        </div>
+        </section>
       )}
 
-      {/* Navigation */}
-      <div className="quick-nav">
-        <button onClick={() => onNavigate('deliver')}>
-          Go to Deliver (for Final assets)
+      {/* Quick Navigation */}
+      <footer className="view-footer">
+        <button className="btn-secondary" onClick={() => onNavigate('deliver')}>
+          Go to Deliver (for Final assets) →
         </button>
-      </div>
-    </div>
-  );
-}
-/**
- * Confidence Indicator Component
- * 
- * Displays confidence score with visual gauge and interpretation.
- */
-function ConfidenceIndicator({ confidence }: { confidence: number }) {
-  const level = getConfidenceLevel(confidence);
-  const percentage = Math.round(confidence * 100);
-
-  return (
-    <div className="confidence-indicator">
-      <div className="confidence-gauge">
-        <div 
-          className="confidence-fill" 
-          style={{ 
-            width: `${percentage}%`,
-            backgroundColor: level.color 
-          }}
-        />
-      </div>
-      <div className="confidence-details">
-        <span className="confidence-value">{percentage}%</span>
-        <span 
-          className="confidence-label"
-          style={{ color: level.color }}
-        >
-          {level.label} Confidence
-        </span>
-      </div>
-      <p className="confidence-explanation">
-        {percentage >= 90 
-          ? 'Processing completed with high accuracy. Results closely match target specifications.'
-          : percentage >= 75
-          ? 'Processing completed with acceptable accuracy. Minor deviations from target may exist.'
-          : 'Processing completed with lower confidence. Review results carefully before approval.'}
-      </p>
+      </footer>
     </div>
   );
 }

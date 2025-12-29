@@ -11,7 +11,7 @@
  * 7. History - Job history
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   useProjects, 
   useProject, 
@@ -22,10 +22,8 @@ import {
   studioOS 
 } from '../api';
 import type { 
-  Project, 
   Asset, 
   Job, 
-  Preset,
   JobProgressEvent 
 } from '../api';
 import './StudioOSDashboard.css';
@@ -38,13 +36,20 @@ interface StudioOSDashboardProps {
 
 export function StudioOSDashboard({ onLogout }: StudioOSDashboardProps) {
   const [currentView, setCurrentView] = useState<View>('overview');
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   
   // Data fetching
-  const { data: projectsResponse, loading: loadingProjects, refetch: refetchProjects } = useProjects();
-  const projects = projectsResponse?.data || [];
+  const { data: projectsResponse, loading: loadingProjects } = useProjects();
   
-  // Select first project by default
+  // Initialize selected project from first in list  
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(() => {
+    const initialProjects = projectsResponse?.data || [];
+    return initialProjects.length > 0 ? initialProjects[0].id : null;
+  });
+  
+  // Use memoized projects array
+  const projects = useMemo(() => projectsResponse?.data || [], [projectsResponse]);
+  
+  // Update selected project when projects change (if none selected)
   useEffect(() => {
     if (projects.length > 0 && !selectedProjectId) {
       setSelectedProjectId(projects[0].id);
@@ -98,7 +103,6 @@ export function StudioOSDashboard({ onLogout }: StudioOSDashboardProps) {
             view={currentView} 
             projectId={selectedProjectId}
             onNavigate={setCurrentView}
-            onRefreshProjects={refetchProjects}
           />
         ) : (
           <div className="empty-state">
@@ -118,10 +122,9 @@ interface ViewContentProps {
   view: View;
   projectId: number;
   onNavigate: (view: View) => void;
-  onRefreshProjects: () => void;
 }
 
-function ViewContent({ view, projectId, onNavigate, onRefreshProjects }: ViewContentProps) {
+function ViewContent({ view, projectId, onNavigate }: ViewContentProps) {
   switch (view) {
     case 'overview':
       return <OverviewView projectId={projectId} onNavigate={onNavigate} />;
@@ -236,7 +239,7 @@ function OverviewView({ projectId, onNavigate }: { projectId: number; onNavigate
 // =============================================================================
 
 function AssetsView({ projectId }: { projectId: number }) {
-  const { data: assetsResponse, loading, refetch } = useAssets(projectId);
+  const { data: assetsResponse, loading } = useAssets(projectId);
   const assets = assetsResponse?.data || [];
   const [filter, setFilter] = useState<'ALL' | 'RAW' | 'DERIVED' | 'FINAL'>('ALL');
 
@@ -372,7 +375,6 @@ function TransformView({ projectId, onNavigate }: { projectId: number; onNavigat
   
   const [selectedAssets, setSelectedAssets] = useState<number[]>([]);
   const [selectedPreset, setSelectedPreset] = useState<string>('');
-  const [parameters, setParameters] = useState<Record<string, unknown>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -390,7 +392,7 @@ function TransformView({ projectId, onNavigate }: { projectId: number; onNavigat
         projectId,
         preset: selectedPreset,
         assetIds: selectedAssets,
-        parameters,
+        parameters: {},
       });
       onNavigate('history');
     } catch (err) {
@@ -529,7 +531,7 @@ function JobReviewCard({ job }: { job: Job }) {
             <div className="job-report">
               <h5>Report</h5>
               <span className="confidence">
-                Confidence: {(job.report.confidence * 100).toFixed(0)}%
+                Confidence: {job.report.confidence}
               </span>
             </div>
           )}

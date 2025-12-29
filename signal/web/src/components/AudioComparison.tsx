@@ -6,7 +6,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import type { Asset } from '../../api';
+import type { Asset } from '../api/types';
 
 interface AudioComparisonProps {
   inputAsset: Asset | null;

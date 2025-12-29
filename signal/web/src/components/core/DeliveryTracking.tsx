@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FormField } from '../FormField';
+import { studioOS } from '../../api/client';
+import type { Delivery as ApiDelivery } from '../../api/types';
 import './DeliveryTracking.css';
 
 interface TrackingEvent {
@@ -36,7 +38,7 @@ interface DeliveryTrackingProps {
   realTimeUpdates?: boolean;
 }
 
-const STATUS_ICONS = {
+const STATUS_ICONS: Record<string, string> = {
   pending: '⏳',
   validating: '🔍',
   processing: '⚙️',
@@ -46,7 +48,7 @@ const STATUS_ICONS = {
   cancelled: '🚫'
 };
 
-const STATUS_COLORS = {
+const STATUS_COLORS: Record<string, string> = {
   pending: '#6b7280',
   validating: '#f59e0b',
   processing: '#3b82f6',
@@ -79,7 +81,7 @@ export const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({
   useEffect(() => {
     loadDeliveryStatus();
     
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (autoRefresh) {
       interval = setInterval(loadDeliveryStatus, 3000);
     }
@@ -98,96 +100,48 @@ export const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({
   const loadDeliveryStatus = async () => {
     try {
       setError(null);
-      const response = await fetch(`/api/deliveries/${deliveryId}`);
+      const apiDelivery = await studioOS.getDelivery(parseInt(deliveryId));
       
-      if (!response.ok) {
-        throw new Error(`Failed to fetch delivery: ${response.status}`);
-      }
+      // Map API response to component format
+      const mappedStatus: DeliveryStatus = {
+        deliveryId: String(apiDelivery.id),
+        title: apiDelivery.destination,
+        status: apiDelivery.status,
+        platforms: [{
+          id: apiDelivery.destination.toLowerCase().replace(/\s+/g, '_'),
+          name: apiDelivery.destination,
+          status: apiDelivery.status,
+          progress: apiDelivery.status === 'completed' ? 100 : apiDelivery.status === 'pending' ? 0 : 50,
+          url: apiDelivery.status === 'completed' ? undefined : undefined,
+          error: apiDelivery.status === 'failed' ? 'Delivery failed' : undefined
+        }],
+        events: [
+          {
+            id: 'event_created',
+            timestamp: new Date(apiDelivery.createdAt).getTime(),
+            type: 'delivery_created',
+            message: 'Delivery initiated',
+            status: 'pending'
+          },
+          ...(apiDelivery.completedAt ? [{
+            id: 'event_completed',
+            timestamp: new Date(apiDelivery.completedAt).getTime(),
+            type: apiDelivery.status === 'completed' ? 'delivery_completed' : 'delivery_failed',
+            message: apiDelivery.status === 'completed' ? 'Delivery completed' : 'Delivery failed',
+            status: apiDelivery.status
+          }] : [])
+        ],
+        createdAt: new Date(apiDelivery.createdAt).getTime(),
+        updatedAt: new Date(apiDelivery.completedAt || apiDelivery.createdAt).getTime()
+      };
       
-      const data = await response.json();
-      
-      if (data.success) {
-        setStatus(data.delivery);
-      } else {
-        throw new Error(data.error || 'Unknown error');
-      }
+      setStatus(mappedStatus);
     } catch (err) {
-      console.error('Failed to load delivery status:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load delivery');
-      
-      // Use mock data for demo
-      setStatus(generateMockStatus());
+      console.error('The delivery status failed to load due to System error.', err);
+      setError(err instanceof Error ? err.message : 'Failed to load delivery status');
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const generateMockStatus = (): DeliveryStatus => {
-    const platforms = [
-      { id: 'spotify', name: 'Spotify' },
-      { id: 'apple_music', name: 'Apple Music' },
-      { id: 'youtube_music', name: 'YouTube Music' }
-    ];
-    
-    const statuses = ['delivered', 'uploading', 'failed'];
-    
-    return {
-      deliveryId,
-      title: 'Summer Album Release',
-      status: 'uploading',
-      platforms: platforms.map((platform, index) => ({
-        ...platform,
-        status: statuses[index],
-        progress: statuses[index] === 'delivered' ? 100 : 
-                 statuses[index] === 'failed' ? 0 : 
-                 Math.floor(Math.random() * 80) + 20,
-        url: statuses[index] === 'delivered' ? 
-             `https://${platform.id}.example.com/release/123` : undefined,
-        error: statuses[index] === 'failed' ? 
-               'Upload timeout - retrying automatically' : undefined
-      })),
-      events: [
-        {
-          id: 'event_1',
-          timestamp: Date.now() - 7200000,
-          type: 'delivery_created',
-          message: 'Delivery job created',
-          status: 'pending'
-        },
-        {
-          id: 'event_2',
-          timestamp: Date.now() - 5400000,
-          type: 'validation_started',
-          message: 'Asset validation started',
-          status: 'validating'
-        },
-        {
-          id: 'event_3',
-          timestamp: Date.now() - 3600000,
-          type: 'validation_completed',
-          message: 'All assets validated successfully',
-          status: 'processing'
-        },
-        {
-          id: 'event_4',
-          timestamp: Date.now() - 1800000,
-          type: 'upload_started',
-          message: 'Upload to platforms initiated',
-          status: 'uploading'
-        },
-        {
-          id: 'event_5',
-          timestamp: Date.now() - 900000,
-          type: 'platform_delivered',
-          message: 'Successfully delivered to Spotify',
-          platform: 'spotify',
-          status: 'delivered'
-        }
-      ],
-      createdAt: Date.now() - 7200000,
-      updatedAt: Date.now() - 900000,
-      estimatedCompletion: Date.now() + 1800000
-    };
   };
 
   const formatTimestamp = (timestamp: number): string => {

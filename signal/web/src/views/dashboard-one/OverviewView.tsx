@@ -1,11 +1,23 @@
 /**
  * Dashboard One - Overview View
  * 
- * Displays project status, recent activity, and quick navigation.
- * Per STUDIOOS_FUNCTIONAL_SPECS.md Section 4.1
+ * ============================================================================
+ * PERSONA: Independent Rap Artist
+ * ============================================================================
+ * 
+ * PRIMARY QUESTION: "What's the status of my project?"
+ * 
+ * SUCCESS CONDITION: User understands project state in < 5 seconds
+ * 
+ * COMPONENT USAGE:
+ * - JobManager: Shows active/queued/failed jobs
+ *   Answers "is anything running?" and "did anything fail?"
+ * 
+ * ============================================================================
  */
 
 import { useProjects } from '../../api';
+import { JobManager } from '../../components/core';
 import type { Project } from '../../api';
 
 interface OverviewViewProps {
@@ -41,69 +53,87 @@ export function OverviewView({ role: _role, onNavigate }: OverviewViewProps) {
 
   return (
     <div className="overview-view">
-      <h2>Overview</h2>
+      <header className="view-header">
+        <h2 className="view-title">Overview</h2>
+        <p className="view-subtitle">Current status of your production workspace</p>
+      </header>
       
-      {/* Status Summary */}
-      <div className="status-cards">
-        <div className="status-card">
-          <h3>Total Projects</h3>
-          <span className="count">{projects.length}</span>
+      {/* Status Summary — Artist: "what's the quick picture?" */}
+      <section className="status-summary">
+        <div className="stat-card">
+          <span className="stat-value">{projects.length}</span>
+          <span className="stat-label">Total Projects</span>
         </div>
-        <div className="status-card processing">
-          <h3>Processing</h3>
-          <span className="count">{activeProjects.length}</span>
+        <div className="stat-card processing">
+          <span className="stat-value">{activeProjects.length}</span>
+          <span className="stat-label">Processing</span>
         </div>
-        <div className="status-card ready">
-          <h3>Ready for Review</h3>
-          <span className="count">{readyProjects.length}</span>
+        <div className="stat-card ready">
+          <span className="stat-value">{readyProjects.length}</span>
+          <span className="stat-label">Ready for Review</span>
         </div>
-      </div>
+      </section>
 
-      {/* Quick Actions */}
-      <div className="quick-actions">
-        <h3>Quick Actions</h3>
-        <button onClick={() => onNavigate('create')}>Create New Project</button>
-        <button onClick={() => onNavigate('assets')}>Manage Assets</button>
-        <button onClick={() => onNavigate('history')}>View History</button>
-      </div>
+      {/* Quick Actions — Artist: fast paths to common tasks */}
+      <section className="quick-actions">
+        <h3 className="section-title">Quick Actions</h3>
+        <div className="action-buttons">
+          <button className="action-btn" onClick={() => onNavigate('create')}>
+            <span className="action-icon">📁</span>
+            <span className="action-label">Upload Assets</span>
+          </button>
+          <button className="action-btn" onClick={() => onNavigate('transform')}>
+            <span className="action-icon">⚙️</span>
+            <span className="action-label">Start Processing</span>
+          </button>
+          <button className="action-btn" onClick={() => onNavigate('deliver')}>
+            <span className="action-icon">📤</span>
+            <span className="action-label">Prepare Delivery</span>
+          </button>
+        </div>
+      </section>
 
-      {/* Recent Projects */}
-      <div className="recent-projects">
-        <h3>Recent Projects</h3>
+      {/* Job Activity — Primary component: JobManager */}
+      <section className="job-activity">
+        <h3 className="section-title">Job Activity</h3>
+        <div className="component-container">
+          <JobManager />
+        </div>
+      </section>
+
+      {/* Recent Projects — Quick reference list */}
+      <section className="recent-projects">
+        <h3 className="section-title">Recent Projects</h3>
         {recentProjects.length === 0 ? (
-          <p>No projects yet. Create your first project to get started.</p>
+          <p className="empty-message">No projects yet. Upload assets to create your first project.</p>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>State</th>
-                <th>Assets</th>
-                <th>Jobs</th>
-                <th>Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentProjects.map(project => (
-                <tr key={project.id}>
-                  <td>{project.name}</td>
-                  <td>
-                    <span 
-                      className="state-badge" 
-                      style={{ backgroundColor: getStateColor(project.state) }}
-                    >
-                      {project.state}
-                    </span>
-                  </td>
-                  <td>{project._count?.assets ?? 0}</td>
-                  <td>{project._count?.jobs ?? 0}</td>
-                  <td>{new Date(project.updatedAt).toLocaleDateString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="project-table">
+            <div className="table-header">
+              <span>Name</span>
+              <span>State</span>
+              <span>Assets</span>
+              <span>Jobs</span>
+              <span>Updated</span>
+            </div>
+            {recentProjects.map(project => (
+              <div key={project.id} className="table-row">
+                <span className="project-name">{project.name}</span>
+                <span>
+                  <span 
+                    className="state-badge" 
+                    style={{ backgroundColor: getStateColor(project.state) }}
+                  >
+                    {project.state}
+                  </span>
+                </span>
+                <span>{project._count?.assets ?? 0}</span>
+                <span>{project._count?.jobs ?? 0}</span>
+                <span>{new Date(project.updatedAt).toLocaleDateString()}</span>
+              </div>
+            ))}
+          </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

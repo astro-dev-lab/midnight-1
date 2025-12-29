@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { FormField } from './FormField';
+import React, { useState, useEffect } from 'react';
+import { studioOS } from '../../api/client';
+import { jobEvents } from '../../api/events';
+import type { FormattedReport, JobProgressEvent } from '../../api/types';
 import './ProcessingReport.css';
 
 interface ProcessingStep {
@@ -17,131 +19,84 @@ interface ProcessingStep {
 }
 
 interface ProcessingReportProps {
-  jobId?: string;
+  jobId?: number;
   steps?: ProcessingStep[];
   isLive?: boolean;
   onStepClick?: (step: ProcessingStep) => void;
 }
 
-const DEMO_STEPS: ProcessingStep[] = [
-  {
-    id: 'validation',
-    name: 'Audio Validation',
-    status: 'completed',
-    duration: 127,
-    details: 'File format validated, metadata extracted',
-    confidence: 98,
-    metrics: {
-      before: { format: 'WAV', channels: 2, sampleRate: 44100 },
-      after: { status: 'valid' },
-      delta: null
-    }
-  },
-  {
-    id: 'analysis',
-    name: 'Loudness Analysis',
-    status: 'completed',
-    duration: 341,
-    details: 'EBU R128 analysis with gating',
-    confidence: 96,
-    metrics: {
-      before: { loudness: -12.3, truePeak: 0.2, lra: 4.1 },
-      after: { loudness: -12.3, truePeak: 0.2, lra: 4.1 },
-      delta: { analyzed: true }
-    }
-  },
-  {
-    id: 'spectral',
-    name: 'Spectral Analysis',
-    status: 'completed',
-    duration: 892,
-    details: 'Frequency content analysis and problem detection',
-    confidence: 94,
-    metrics: {
-      before: { spectrum: 'unknown' },
-      after: { nyquist: 22050, dc_offset: -0.001 },
-      delta: { problems: ['Low-end buildup below 40Hz'] }
-    }
-  },
-  {
-    id: 'normalize',
-    name: 'Loudness Normalization',
-    status: 'running',
-    details: 'Normalizing to -14 LUFS target',
-    confidence: null,
-    metrics: null
-  },
-  {
-    id: 'limiting',
-    name: 'True Peak Limiting',
-    status: 'pending',
-    details: 'True peak limiting to -1 dBTP',
-    confidence: null,
-    metrics: null
-  },
-  {
-    id: 'export',
-    name: 'Export Processing',
-    status: 'pending',
-    details: 'Rendering final output',
-    confidence: null,
-    metrics: null
-  }
-];
-
 export const ProcessingReport: React.FC<ProcessingReportProps> = ({
   jobId,
-  steps = DEMO_STEPS,
+  steps = [],
   isLive = false,
   onStepClick
 }) => {
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
-  const [liveSteps, setLiveSteps] = useState(steps);
-  const intervalRef = useRef<NodeJS.Timeout>();
+  const [liveSteps, setLiveSteps] = useState<ProcessingStep[]>(steps);
+  const [report, setReport] = useState<FormattedReport | null>(null);
+  const [isLoading, setIsLoading] = useState(!!jobId);
 
+  // Load report data from API
   useEffect(() => {
-    if (isLive) {
-      // Simulate live updates
-      intervalRef.current = setInterval(() => {
-        setLiveSteps(prev => {
-          const runningIndex = prev.findIndex(s => s.status === 'running');
-          if (runningIndex === -1) return prev;
-
-          const updated = [...prev];
-          const runningStep = updated[runningIndex];
-          
-          // Complete running step
-          updated[runningIndex] = {
-            ...runningStep,
-            status: 'completed',
-            duration: Math.floor(Math.random() * 800) + 200,
-            confidence: Math.floor(Math.random() * 10) + 90,
-            metrics: {
-              before: { value: 'original' },
-              after: { value: 'processed' },
-              delta: { change: 'applied' }
-            }
-          };
-
-          // Start next step
-          if (runningIndex + 1 < updated.length) {
-            updated[runningIndex + 1] = {
-              ...updated[runningIndex + 1],
-              status: 'running'
-            };
-          }
-
-          return updated;
-        });
-      }, 2000);
+    if (!jobId || jobId <= 0) {
+      setIsLoading(false);
+      return;
     }
 
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+    const loadReport = async () => {
+      try {
+        const formattedReport = await studioOS.getFormattedReport(jobId);
+        setReport(formattedReport);
+        
+        // Convert report sections to processing steps
+        const stepsFromReport: ProcessingStep[] = formattedReport.sections.map((section, index) => ({
+          id: `step_${index}`,
+          name: section.title,
+          status: 'completed' as const,
+          details: typeof section.content === 'string' ? section.content : JSON.stringify(section.content),
+          confidence: formattedReport.confidence,
+          metrics: typeof section.content === 'object' ? {
+            before: null,
+            after: section.content,
+            delta: null
+          } : undefined
+        }));
+        
+        setLiveSteps(stepsFromReport);
+      } catch (error) {
+        console.error('The processing report failed to load due to System error.', error);
+      } finally {
+        setIsLoading(false);
       }
     };
-  }, [isLive]);
+
+    loadReport();
+
+    // Subscribe to SSE for live updates
+    if (isLive) {
+      jobEvents.connect(0); // Would need project ID for proper connection
+      
+      const unsubscribe = jobEvents.on('*', (event: JobProgressEvent) => {
+        if (event.jobId === jobId) {
+          // Update steps based on SSE events
+          setLiveSteps(prev => {
+            const updated = [...prev];
+            const currentStep = updated.find(s => s.status === 'running');
+            if (currentStep && event.phase) {
+              currentStep.status = event.type === 'job:completed' ? 'completed' : 
+                                   event.type === 'job:failed' ? 'error' : 'running';
+              currentStep.details = event.message;
+            }
+            return updated;
+          });
+        }
+      });
+
+      return () => {
+        unsubscribe();
+      };
+    }
+  }, [jobId, isLive]);
 
   const handleStepClick = (step: ProcessingStep) => {
     if (step.status === 'pending' || step.status === 'running') return;
@@ -188,7 +143,15 @@ export const ProcessingReport: React.FC<ProcessingReportProps> = ({
 
   const completedSteps = liveSteps.filter(s => s.status === 'completed').length;
   const totalSteps = liveSteps.length;
-  const progressPercent = (completedSteps / totalSteps) * 100;
+  const progressPercent = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
+
+  if (isLoading) {
+    return (
+      <div className="processing-report loading">
+        <div className="loading-spinner">Loading report...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="processing-report">
@@ -279,6 +242,11 @@ export const ProcessingReport: React.FC<ProcessingReportProps> = ({
         <div className="report-footer">
           <div className="job-id">
             Job ID: <code>{jobId}</code>
+            {report && (
+              <span className="report-confidence">
+                 • Confidence: {(report.confidence * 100).toFixed(0)}%
+              </span>
+            )}
           </div>
           <div className="report-actions">
             <button className="btn-secondary">Download Report</button>

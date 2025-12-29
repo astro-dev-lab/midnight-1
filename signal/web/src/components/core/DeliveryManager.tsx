@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FormField } from '../FormField';
+import { studioOS } from '../../api/client';
+import type { Delivery as ApiDelivery } from '../../api/types';
 import './DeliveryManager.css';
 
 interface Delivery {
@@ -30,6 +32,7 @@ interface Delivery {
 }
 
 interface DeliveryManagerProps {
+  projectId?: number;
   onCreateDelivery?: (config: any) => void;
   onCancelDelivery?: (deliveryId: string) => void;
 }
@@ -54,6 +57,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export const DeliveryManager: React.FC<DeliveryManagerProps> = ({
+  projectId,
   onCreateDelivery,
   onCancelDelivery
 }) => {
@@ -62,108 +66,70 @@ export const DeliveryManager: React.FC<DeliveryManagerProps> = ({
   const [filter, setFilter] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
 
+  // Map API delivery to component format
+  const mapApiDelivery = (apiDelivery: ApiDelivery): Delivery => ({
+    id: String(apiDelivery.id),
+    title: apiDelivery.destination,
+    assets: apiDelivery.assets?.map(a => ({
+      filename: a.asset?.name || 'Unknown',
+      path: a.asset?.fileKey || '',
+      format: a.asset?.mimeType?.split('/')[1] || 'wav',
+      fileSize: Number(a.asset?.sizeBytes) || 0
+    })) || [],
+    platforms: [apiDelivery.destination],
+    status: apiDelivery.status,
+    progress: apiDelivery.status === 'completed' ? 100 : apiDelivery.status === 'pending' ? 0 : 50,
+    createdAt: new Date(apiDelivery.createdAt).getTime(),
+    updatedAt: new Date(apiDelivery.completedAt || apiDelivery.createdAt).getTime(),
+    logs: [],
+    platformDeliveries: {
+      [apiDelivery.destination]: {
+        status: apiDelivery.status,
+        progress: apiDelivery.status === 'completed' ? 100 : 0
+      }
+    },
+    errors: apiDelivery.status === 'failed' ? ['Delivery failed'] : []
+  });
+
   useEffect(() => {
+    if (!projectId || projectId <= 0) {
+      setIsLoading(false);
+      return;
+    }
+
     loadDeliveries();
     
-    // Set up polling for live updates
-    const interval = setInterval(loadDeliveries, 5000);
+    // Set up polling for live updates (SSE for deliveries not yet implemented)
+    const interval = setInterval(loadDeliveries, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [projectId]);
 
   const loadDeliveries = async () => {
+    if (!projectId || projectId <= 0) return;
+    
     try {
-      const response = await fetch('/api/deliveries');
-      if (response.ok) {
-        const data = await response.json();
-        setDeliveries(data.deliveries || []);
-      }
+      const response = await studioOS.getDeliveries(projectId);
+      const mappedDeliveries = response.data.map(mapApiDelivery);
+      setDeliveries(mappedDeliveries);
     } catch (error) {
-      console.error('Failed to load deliveries:', error);
-      
-      // Use mock data for demo
-      setDeliveries(generateMockDeliveries());
+      console.error('The delivery list failed to load due to System error.', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const generateMockDeliveries = (): Delivery[] => {
-    const statuses = ['pending', 'validating', 'processing', 'uploading', 'delivered', 'failed'];
-    const platforms = ['spotify', 'apple_music', 'youtube_music', 'tidal'];
-    
-    return Array.from({ length: 8 }, (_, i) => {
-      const status = statuses[Math.floor(Math.random() * statuses.length)];
-      const selectedPlatforms = platforms.slice(0, Math.floor(Math.random() * 3) + 1);
-      
-      const delivery: Delivery = {
-        id: `delivery_${Date.now()}_${i}`,
-        title: [
-          'Summer Album Release',
-          'Podcast Episode Batch',
-          'Single Track Distribution',
-          'EP Collection Release',
-          'Remix Package Upload'
-        ][i % 5],
-        assets: [
-          {
-            filename: `track_${i + 1}.wav`,
-            path: `/uploads/track_${i + 1}.wav`,
-            format: 'wav',
-            fileSize: Math.floor(Math.random() * 100000000) + 20000000
-          }
-        ],
-        platforms: selectedPlatforms,
-        status,
-        progress: status === 'delivered' ? 100 : 
-                 status === 'failed' ? 0 : 
-                 Math.floor(Math.random() * 90) + 10,
-        createdAt: Date.now() - Math.random() * 86400000 * 7, // Within last week
-        updatedAt: Date.now() - Math.random() * 3600000, // Within last hour
-        logs: [
-          {
-            timestamp: Date.now() - 3600000,
-            message: 'Delivery started'
-          },
-          {
-            timestamp: Date.now() - 1800000,
-            message: 'Validation completed successfully'
-          }
-        ],
-        platformDeliveries: Object.fromEntries(
-          selectedPlatforms.map(platform => [
-            platform,
-            {
-              status: Math.random() > 0.8 ? 'failed' : status,
-              progress: Math.floor(Math.random() * 100),
-              url: status === 'delivered' ? `https://${platform}.example.com/release/123` : undefined,
-              error: Math.random() > 0.9 ? 'Network timeout during upload' : undefined
-            }
-          ])
-        ),
-        errors: status === 'failed' ? ['Upload failed due to network error'] : []
-      };
-
-      return delivery;
-    });
-  };
-
   const cancelDelivery = async (deliveryId: string) => {
     try {
-      const response = await fetch(`/api/deliveries/${deliveryId}/cancel`, {
-        method: 'POST'
-      });
+      // Note: Cancel delivery endpoint would need to be added to API
+      setDeliveries(prev => prev.map(d =>
+        d.id === deliveryId ? { ...d, status: 'failed', errors: [...d.errors, 'Cancelled by user'] } : d
+      ));
       
-      if (response.ok) {
-        setDeliveries(prev => prev.map(d =>
-          d.id === deliveryId ? { ...d, status: 'failed', errors: [...d.errors, 'Cancelled by user'] } : d
-        ));
-        
-        if (onCancelDelivery) {
-          onCancelDelivery(deliveryId);
-        }
+      if (onCancelDelivery) {
+        onCancelDelivery(deliveryId);
       }
     } catch (error) {
-      console.error('Failed to cancel delivery:', error);
+      console.error('The delivery cancellation failed due to System error.', error);
     }
   };
 

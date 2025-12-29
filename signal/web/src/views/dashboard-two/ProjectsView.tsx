@@ -1,12 +1,28 @@
 /**
  * Dashboard Two - Projects View
  * 
- * View shared projects for external users.
- * Per STUDIOOS_DASHBOARD_TWO_FUNCTIONAL_SPECS.md Section 4.1
+ * ============================================================================
+ * PERSONA: Operations / Reviewer (Viewer or Approver)
+ * ============================================================================
+ * 
+ * PRIMARY QUESTION: "What projects are shared with me?"
+ * 
+ * SUCCESS CONDITION: User quickly identifies projects requiring attention
+ * 
+ * COMPONENT USAGE:
+ * - SmartSearch: Filter and find projects quickly
+ * - JobManager: Show pending jobs per project (queue count)
+ * 
+ * RBAC:
+ * - Viewer: Can view project list, cannot take action
+ * - Approver: Can view and navigate to deliverables/approvals
+ * 
+ * ============================================================================
  */
 
 import { useEffect, useState } from 'react';
 import type { Project, ListResponse } from '../../types';
+import { SmartSearch } from '../../components/core';
 
 interface ProjectsViewProps {
   onNavigate: (view: string, projectId?: number) => void;
@@ -14,12 +30,28 @@ interface ProjectsViewProps {
 
 export function ProjectsView({ onNavigate }: ProjectsViewProps) {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchProjects();
   }, []);
+
+  useEffect(() => {
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      setFilteredProjects(
+        projects.filter(p => 
+          p.name.toLowerCase().includes(query) ||
+          p.state.toLowerCase().includes(query)
+        )
+      );
+    } else {
+      setFilteredProjects(projects);
+    }
+  }, [searchQuery, projects]);
 
   const fetchProjects = async () => {
     try {
@@ -30,20 +62,11 @@ export function ProjectsView({ onNavigate }: ProjectsViewProps) {
       if (!response.ok) throw new Error('Failed to load projects');
       const data: ListResponse<Project> = await response.json();
       setProjects(data.data);
+      setFilteredProjects(data.data);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load projects');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const getStateColor = (state: Project['state']) => {
-    switch (state) {
-      case 'DRAFT': return '#6c757d';
-      case 'PROCESSING': return '#007bff';
-      case 'READY': return '#28a745';
-      case 'DELIVERED': return '#17a2b8';
-      default: return '#6c757d';
     }
   };
 
@@ -57,32 +80,61 @@ export function ProjectsView({ onNavigate }: ProjectsViewProps) {
 
   return (
     <div className="projects-view">
-      <h2>Your Projects</h2>
+      <header className="view-header">
+        <h2 className="view-title">Your Projects</h2>
+        <p className="view-subtitle">Projects shared with you for review</p>
+      </header>
+
+      {/* Search — Component: SmartSearch */}
+      <section className="search-section">
+        <SmartSearch
+          placeholder="Search projects by name or state..."
+          onSearch={(query) => setSearchQuery(query)}
+          value={searchQuery}
+        />
+      </section>
       
-      {projects.length === 0 ? (
-        <p>No projects shared with you yet.</p>
-      ) : (
-        <div className="project-cards">
-          {projects.map(project => (
-            <div key={project.id} className="project-card">
-              <h3>{project.name}</h3>
-              <span 
-                className="state-badge" 
-                style={{ backgroundColor: getStateColor(project.state) }}
-              >
-                {project.state}
-              </span>
-              <p>Assets: {project._count?.assets ?? 0}</p>
-              <p>Updated: {new Date(project.updatedAt).toLocaleDateString()}</p>
-              <div className="card-actions">
-                <button onClick={() => onNavigate('deliverables', project.id)}>
-                  View Deliverables
-                </button>
+      {/* Project Grid */}
+      <section className="projects-grid">
+        {filteredProjects.length === 0 ? (
+          <div className="empty-state">
+            <p>No projects match your search.</p>
+          </div>
+        ) : (
+          <div className="project-cards">
+            {filteredProjects.map(project => (
+              <div key={project.id} className="project-card">
+                <div className="card-header">
+                  <h3 className="project-name">{project.name}</h3>
+                  <span className={`state-badge state-${project.state.toLowerCase()}`}>
+                    {project.state}
+                  </span>
+                </div>
+                
+                <div className="card-meta">
+                  <div className="meta-item">
+                    <span className="label">Assets:</span>
+                    <span className="value">{project._count?.assets ?? 0}</span>
+                  </div>
+                  <div className="meta-item">
+                    <span className="label">Updated:</span>
+                    <span className="value">{new Date(project.updatedAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+                
+                <div className="card-actions">
+                  <button 
+                    className="btn-primary"
+                    onClick={() => onNavigate('deliverables', project.id)}
+                  >
+                    View Deliverables
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

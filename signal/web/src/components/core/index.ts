@@ -1,7 +1,9 @@
 // Core component exports for midnight signal web app
 export { FormField } from '../FormField';
 export { AudioVisualization } from '../AudioVisualization';
-export { MetadataEditor } from '../MetadataEditor';
+export { AudioComparison } from '../AudioComparison';
+export { MetadataEditor } from './MetadataEditor';
+export type { AssetMetadata } from './MetadataEditor';
 export { BatchUploader } from './BatchUploader';
 export { QualityPresets } from './QualityPresets';
 export { ProcessingReport } from './ProcessingReport';

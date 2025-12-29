@@ -24,6 +24,22 @@ export type {
 // SSE Events
 export { subscribeToJobEvents, JobEventsClient, jobEvents } from './events';
 
+// State Machine Validation
+export {
+  validateProjectTransition,
+  validateAssetTransition,
+  validateJobTransition,
+  canProjectTransitionTo,
+  canAssetTransitionTo,
+  canJobTransitionTo,
+  getNextProjectStates,
+  getNextAssetCategories,
+  getNextJobStates,
+  isTerminalProjectState,
+  isTerminalAssetCategory,
+  isTerminalJobState,
+} from './stateMachine';
+
 // React Hooks
 export {
   useProjects,

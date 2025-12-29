@@ -1,0 +1,474 @@
+/**
+ * ============================================================================
+ * DASHBOARD ONE — CSS
+ * StudioOS Artist/Creator Workspace Styles
+ * ============================================================================
+ */
+
+/* ============================================================================
+   Layout Foundation
+   ============================================================================ */
+
+.dashboard-one {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--color-background, #f8f9fa);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  color: var(--color-text, #1a1a2e);
+}
+
+/* ============================================================================
+   Header
+   ============================================================================ */
+
+.dashboard-one .dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background: var(--color-surface, #ffffff);
+  border-bottom: 1px solid var(--color-border, #e0e0e0);
+}
+
+.dashboard-identity {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.dashboard-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text, #1a1a2e);
+}
+
+.dashboard-context {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #6c757d);
+}
+
+.dashboard-user {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.user-role-badge {
+  padding: 0.25rem 0.75rem;
+  background: var(--color-primary-light, #e3f2fd);
+  color: var(--color-primary, #1565c0);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.btn-logout {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  color: var(--color-text-secondary, #6c757d);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 4px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-logout:hover {
+  background: var(--color-error, #dc3545);
+  color: white;
+  border-color: var(--color-error, #dc3545);
+}
+
+/* ============================================================================
+   Navigation
+   ============================================================================ */
+
+.dashboard-one .dashboard-nav {
+  display: flex;
+  padding: 0 2rem;
+  background: var(--color-surface, #ffffff);
+  border-bottom: 1px solid var(--color-border, #e0e0e0);
+  gap: 0.25rem;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.25rem;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--color-text-secondary, #6c757d);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nav-item:hover {
+  color: var(--color-text, #1a1a2e);
+  background: var(--color-background, #f8f9fa);
+}
+
+.nav-item.active {
+  color: var(--color-primary, #1565c0);
+  border-bottom-color: var(--color-primary, #1565c0);
+}
+
+.nav-icon {
+  font-size: 1rem;
+}
+
+/* ============================================================================
+   Main Content
+   ============================================================================ */
+
+.dashboard-one .dashboard-main {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+.view {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.view-header {
+  margin-bottom: 2rem;
+}
+
+.view-title {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: var(--color-text, #1a1a2e);
+}
+
+.view-subtitle {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #6c757d);
+}
+
+.section-title {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text, #1a1a2e);
+}
+
+/* ============================================================================
+   Overview View
+   ============================================================================ */
+
+.view-overview .quick-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.action-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.5rem;
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-card:hover {
+  border-color: var(--color-primary, #1565c0);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.action-icon {
+  font-size: 2rem;
+}
+
+.action-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text, #1a1a2e);
+}
+
+.job-status-section {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+/* ============================================================================
+   Assets View
+   ============================================================================ */
+
+.assets-layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  grid-template-rows: auto 1fr;
+  gap: 1.5rem;
+}
+
+.assets-search {
+  grid-column: 1 / -1;
+}
+
+.assets-list {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.asset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.asset-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  padding: 1rem;
+  background: var(--color-background, #f8f9fa);
+  border: 2px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.asset-card:hover {
+  border-color: var(--color-primary, #1565c0);
+}
+
+.asset-card.selected {
+  border-color: var(--color-primary, #1565c0);
+  background: var(--color-primary-light, #e3f2fd);
+}
+
+.asset-icon {
+  font-size: 1.5rem;
+}
+
+.asset-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text, #1a1a2e);
+  word-break: break-word;
+}
+
+.asset-category {
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.category-raw {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.category-derived {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.category-final {
+  background: #d4edda;
+  color: #155724;
+}
+
+.assets-metadata {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+/* ============================================================================
+   Create View
+   ============================================================================ */
+
+.view-create .upload-section {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 8px;
+  padding: 2rem;
+}
+
+/* ============================================================================
+   Transform View
+   ============================================================================ */
+
+.transform-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.transform-visualization {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.visualization-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.viz-panel {
+  background: var(--color-background, #f8f9fa);
+  border-radius: 4px;
+  padding: 1rem;
+}
+
+.transform-presets {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.role-notice {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: #fff3cd;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: #856404;
+}
+
+.transform-submit {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-primary {
+  padding: 0.75rem 2rem;
+  background: var(--color-primary, #1565c0);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-dark, #0d47a1);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============================================================================
+   Review View
+   ============================================================================ */
+
+.review-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.review-report,
+.review-comparison {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  text-align: center;
+  color: var(--color-text-secondary, #6c757d);
+}
+
+.empty-state p {
+  margin: 0.5rem 0 0 0;
+}
+
+/* ============================================================================
+   Deliver View
+   ============================================================================ */
+
+.deliver-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.deliver-platforms,
+.deliver-manager {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+/* ============================================================================
+   History View
+   ============================================================================ */
+
+.view-history .history-tracking {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+/* ============================================================================
+   Responsive
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .dashboard-one .dashboard-header {
+    padding: 1rem;
+  }
+
+  .dashboard-one .dashboard-nav {
+    padding: 0 1rem;
+    overflow-x: auto;
+  }
+
+  .nav-label {
+    display: none;
+  }
+
+  .dashboard-one .dashboard-main {
+    padding: 1rem;
+  }
+
+  .assets-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .visualization-grid {
+    grid-template-columns: 1fr;
+  }
+}

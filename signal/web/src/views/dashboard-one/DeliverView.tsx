@@ -1,13 +1,29 @@
 /**
  * Dashboard One - Deliver View
  * 
- * Deliver final assets to destinations.
- * Per STUDIOOS_FUNCTIONAL_SPECS.md Section 4.6
+ * ============================================================================
+ * PERSONA: Independent Rap Artist
+ * ============================================================================
+ * 
+ * PRIMARY QUESTION: "How do I get my finished work out to platforms?"
+ * 
+ * SUCCESS CONDITION: User initiates export with confidence in destinations
+ * 
+ * COMPONENT USAGE:
+ * - PlatformExports: Configure and initiate platform deliveries
+ * - DeliveryManager: Monitor and manage active deliveries
+ * 
+ * RBAC ENFORCEMENT:
+ * - Basic/Standard: Single asset delivery only
+ * - Advanced: Batch delivery + custom destinations
+ * 
+ * ============================================================================
  */
 
-import { useEffect, useState } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useProjects, studioOS } from '../../api';
-import type { Asset, Delivery } from '../../api';
+import type { Asset } from '../../api';
+import { PlatformExports, DeliveryManager } from '../../components/core';
 
 interface DeliverViewProps {
   projectId?: number | null;
@@ -15,22 +31,12 @@ interface DeliverViewProps {
   onNavigate: (view: string, id?: number) => void;
 }
 
-// Delivery destinations (would come from API in production)
-const DESTINATIONS = [
-  { id: 'download', name: 'Direct Download', description: 'Download files directly' },
-  { id: 's3', name: 'S3 Bucket', description: 'Upload to AWS S3' },
-  { id: 'gcs', name: 'Google Cloud Storage', description: 'Upload to GCS' },
-  { id: 'ftp', name: 'FTP Server', description: 'Transfer via FTP' }
-];
-
-export function DeliverView({ projectId: _projectId, role, onNavigate: _onNavigate }: DeliverViewProps) {
+export function DeliverView({ projectId, role, onNavigate }: DeliverViewProps) {
   const { data: projectsResponse, loading: loadingProjects } = useProjects();
-  const projects = projectsResponse?.data || [];
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const projects = useMemo(() => projectsResponse?.data || [], [projectsResponse]);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(projectId || null);
   const [finalAssets, setFinalAssets] = useState<Asset[]>([]);
-  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [selectedAssetIds, setSelectedAssetIds] = useState<number[]>([]);
-  const [destination, setDestination] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -38,7 +44,6 @@ export function DeliverView({ projectId: _projectId, role, onNavigate: _onNaviga
 
   // Role-based delivery access
   const canBatchDeliver = role === 'ADVANCED';
-  const canConfigureDestinations = role === 'STANDARD' || role === 'ADVANCED';
   const loading = loadingProjects || loadingAssets;
 
   // Set first project as selected when projects load
@@ -51,7 +56,6 @@ export function DeliverView({ projectId: _projectId, role, onNavigate: _onNaviga
   useEffect(() => {
     if (selectedProjectId) {
       fetchFinalAssets(selectedProjectId);
-      fetchDeliveries(selectedProjectId);
     }
   }, [selectedProjectId]);
 
@@ -69,16 +73,12 @@ export function DeliverView({ projectId: _projectId, role, onNavigate: _onNaviga
     }
   };
 
-  const fetchDeliveries = async (projectId: number) => {
-    try {
-      const response = await studioOS.getDeliveries(projectId);
-      setDeliveries(response.data);
-    } catch (err: unknown) {
-      // Ignore delivery fetch errors
-    }
-  };
-
   const handleAssetToggle = (assetId: number) => {
+    // Basic/Standard can only select one
+    if (!canBatchDeliver && selectedAssetIds.length >= 1 && !selectedAssetIds.includes(assetId)) {
+      return;
+    }
+    
     setSelectedAssetIds(prev => 
       prev.includes(assetId) 
         ? prev.filter(id => id !== assetId)
@@ -86,17 +86,9 @@ export function DeliverView({ projectId: _projectId, role, onNavigate: _onNaviga
     );
   };
 
-  const handleDeliver = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedProjectId || !destination) {
-      setError('Please select a destination.');
-      return;
-    }
-
-    // Basic role can only do single asset deliveries
-    if (!canBatchDeliver && selectedAssetIds.length > 1) {
-      setError('Batch delivery requires Advanced role. Select only one asset.');
+  const handleStartExport = async (destination: string) => {
+    if (!selectedProjectId || selectedAssetIds.length === 0) {
+      setError('Please select at least one asset for delivery.');
       return;
     }
 
@@ -108,30 +100,16 @@ export function DeliverView({ projectId: _projectId, role, onNavigate: _onNaviga
       await studioOS.createDelivery({
         projectId: selectedProjectId,
         destination,
-        assetIds: selectedAssetIds.length > 0 ? selectedAssetIds : undefined
+        assetIds: selectedAssetIds
       });
 
       setSuccess('Delivery initiated successfully!');
       setSelectedAssetIds([]);
-      setDestination('');
-      
-      // Refresh deliveries
-      if (selectedProjectId) {
-        fetchDeliveries(selectedProjectId);
-      }
+      // Deliveries are now handled by DeliveryManager component
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to create delivery');
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const getStatusColor = (status: Delivery['status']) => {
-    switch (status) {
-      case 'pending': return '#ffc107';
-      case 'completed': return '#28a745';
-      case 'failed': return '#dc3545';
-      default: return '#6c757d';
     }
   };
 
@@ -141,12 +119,16 @@ export function DeliverView({ projectId: _projectId, role, onNavigate: _onNaviga
 
   return (
     <div className="deliver-view">
-      <h2>Deliver</h2>
+      <header className="view-header">
+        <h2 className="view-title">Deliver</h2>
+        <p className="view-subtitle">Export final assets to platforms and destinations</p>
+      </header>
 
       {/* Project Selection */}
-      <div className="form-group">
-        <label>Project</label>
+      <section className="project-section">
+        <label className="section-label">Project</label>
         <select 
+          className="project-select"
           value={selectedProjectId || ''} 
           onChange={(e) => {
             setSelectedProjectId(parseInt(e.target.value));
@@ -158,111 +140,84 @@ export function DeliverView({ projectId: _projectId, role, onNavigate: _onNaviga
             <option key={p.id} value={p.id}>{p.name} ({p.state})</option>
           ))}
         </select>
-      </div>
+      </section>
 
       {error && <div className="view-error">{error}</div>}
       {success && <div className="view-success">{success}</div>}
 
-      {/* Final Assets */}
-      <div className="final-assets">
-        <h3>Final Assets ({finalAssets.length})</h3>
+      {/* Asset Selection */}
+      <section className="assets-section">
+        <h3 className="section-title">
+          Select Final Assets ({selectedAssetIds.length} of {finalAssets.length})
+        </h3>
+        
         {finalAssets.length === 0 ? (
-          <p>No final assets available for delivery. Approve derived assets first.</p>
+          <div className="empty-state">
+            <p>No final assets available for delivery.</p>
+            <button className="btn-secondary" onClick={() => onNavigate('review')}>
+              Approve derived assets first →
+            </button>
+          </div>
         ) : (
-          <div className="asset-checkboxes">
+          <div className="asset-grid">
             {finalAssets.map(asset => (
-              <label key={asset.id} className="checkbox-label">
+              <label 
+                key={asset.id} 
+                className={`asset-card ${selectedAssetIds.includes(asset.id) ? 'selected' : ''}`}
+              >
                 <input
                   type="checkbox"
                   checked={selectedAssetIds.includes(asset.id)}
                   onChange={() => handleAssetToggle(asset.id)}
                   disabled={!canBatchDeliver && selectedAssetIds.length >= 1 && !selectedAssetIds.includes(asset.id)}
                 />
-                {asset.name}
+                <span className="asset-name">{asset.name}</span>
+                <span className="category-badge">FINAL</span>
               </label>
             ))}
           </div>
         )}
+        
         {!canBatchDeliver && finalAssets.length > 1 && (
           <p className="role-notice">
             Basic/Standard role: Select one asset at a time. Upgrade to Advanced for batch delivery.
           </p>
         )}
-      </div>
+      </section>
 
-      {/* Delivery Form */}
-      <form onSubmit={handleDeliver}>
-        <div className="form-group">
-          <label>Destination</label>
-          {canConfigureDestinations ? (
-            <select value={destination} onChange={(e) => setDestination(e.target.value)}>
-              <option value="">Select Destination</option>
-              {DESTINATIONS.map(dest => (
-                <option key={dest.id} value={dest.id}>
-                  {dest.name} - {dest.description}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <>
-              <select value="download" disabled>
-                <option value="download">Direct Download</option>
-              </select>
-              <input type="hidden" value="download" />
-              <p className="role-notice">
-                Basic role: Standard delivery only. Upgrade for custom destinations.
-              </p>
-            </>
-          )}
+      {/* Platform Exports — Component: PlatformExports */}
+      <section className="export-section">
+        <h3 className="section-title">Export Options</h3>
+        <div className="component-container">
+          <PlatformExports
+            selectedAssets={selectedAssetIds.map(id => String(id))}
+            onStartExport={(configs) => {
+              // Transform export configs and start delivery
+              if (configs.length > 0) {
+                handleStartExport(configs[0].platformId);
+              }
+            }}
+            disabled={submitting || selectedAssetIds.length === 0}
+          />
         </div>
+      </section>
 
-        <button 
-          type="submit" 
-          disabled={submitting || finalAssets.length === 0}
-        >
-          {submitting ? 'Initiating...' : 'Initiate Delivery'}
+      {/* Delivery Manager — Component: DeliveryManager */}
+      <section className="deliveries-section">
+        <h3 className="section-title">Active Deliveries</h3>
+        <div className="component-container">
+          <DeliveryManager
+            projectId={selectedProjectId || undefined}
+          />
+        </div>
+      </section>
+
+      {/* Quick Navigation */}
+      <footer className="view-footer">
+        <button className="btn-secondary" onClick={() => onNavigate('history')}>
+          View Full Delivery History →
         </button>
-      </form>
-
-      {/* Delivery History */}
-      <div className="delivery-history">
-        <h3>Delivery History</h3>
-        {deliveries.length === 0 ? (
-          <p>No deliveries yet.</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Destination</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Completed</th>
-              </tr>
-            </thead>
-            <tbody>
-              {deliveries.map(delivery => (
-                <tr key={delivery.id}>
-                  <td>{delivery.destination}</td>
-                  <td>
-                    <span 
-                      className="status-badge" 
-                      style={{ backgroundColor: getStatusColor(delivery.status) }}
-                    >
-                      {delivery.status}
-                    </span>
-                  </td>
-                  <td>{new Date(delivery.createdAt).toLocaleDateString()}</td>
-                  <td>
-                    {delivery.completedAt 
-                      ? new Date(delivery.completedAt).toLocaleDateString() 
-                      : '-'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      </footer>
     </div>
   );
 }
