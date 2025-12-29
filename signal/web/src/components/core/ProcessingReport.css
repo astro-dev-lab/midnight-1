@@ -1,0 +1,346 @@
+.processing-report {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.report-header {
+  padding: var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.report-header .text-heading {
+  color: var(--color-primary);
+  margin-bottom: var(--space-4);
+}
+
+.progress-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.progress-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--color-primary);
+  transition: width 0.5s ease;
+  border-radius: 3px;
+}
+
+.progress-text {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--color-border);
+  white-space: nowrap;
+}
+
+.processing-timeline {
+  padding: var(--space-6);
+}
+
+.timeline-step {
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 2px;
+  padding: var(--space-3);
+  margin-left: calc(-1 * var(--space-3));
+  margin-right: calc(-1 * var(--space-3));
+}
+
+.timeline-step:last-child {
+  margin-bottom: 0;
+}
+
+.timeline-step:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.timeline-step.expanded {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.timeline-step.pending,
+.timeline-step.running {
+  cursor: default;
+}
+
+.step-connector {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 24px;
+  min-height: 60px;
+}
+
+.connector-line {
+  flex: 1;
+  width: 2px;
+  background: var(--color-border);
+  opacity: 0.3;
+}
+
+.step-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--step-color, var(--color-border));
+  color: white;
+  font-size: 0.8rem;
+  margin: var(--space-1) 0;
+  position: relative;
+  z-index: 1;
+}
+
+.timeline-step.pending .step-icon {
+  background: var(--color-border);
+  color: var(--color-secondary);
+}
+
+.timeline-step.completed .step-icon {
+  background: #22c55e;
+}
+
+.timeline-step.warning .step-icon {
+  background: #f59e0b;
+}
+
+.timeline-step.error .step-icon {
+  background: #ef4444;
+}
+
+.timeline-step.running .step-icon {
+  background: var(--color-primary);
+  animation: pulse 2s infinite;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.step-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-2);
+}
+
+.step-name {
+  font-weight: 600;
+  color: var(--color-primary);
+  font-size: 1rem;
+}
+
+.step-meta {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.duration {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--color-border);
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px var(--space-2);
+  border-radius: 2px;
+}
+
+.confidence {
+  font-size: 0.8rem;
+  padding: 2px var(--space-2);
+  border-radius: 2px;
+  font-weight: 500;
+}
+
+.confidence.high {
+  background: rgba(34, 197, 94, 0.1);
+  color: #16a34a;
+}
+
+.confidence.medium {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+
+.confidence.low {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+.step-details {
+  color: var(--color-border);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  margin-bottom: var(--space-2);
+}
+
+.step-metrics {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.metric-section {
+  min-width: 0;
+}
+
+.metric-section.full-width {
+  grid-column: 1 / -1;
+}
+
+.metric-section h5 {
+  color: var(--color-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--space-1);
+}
+
+.metric-section pre {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  padding: var(--space-3);
+  margin: 0;
+  overflow-x: auto;
+  color: var(--color-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.report-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-secondary);
+}
+
+.job-id {
+  color: var(--color-border);
+  font-size: 0.9rem;
+}
+
+.job-id code {
+  font-family: var(--font-mono);
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px var(--space-2);
+  border-radius: 2px;
+  color: var(--color-primary);
+}
+
+.report-actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .step-header {
+    flex-direction: column;
+    gap: var(--space-2);
+    align-items: flex-start;
+  }
+  
+  .step-meta {
+    gap: var(--space-2);
+  }
+  
+  .metrics-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+  
+  .metric-section.full-width {
+    grid-column: 1;
+  }
+  
+  .report-footer {
+    flex-direction: column;
+    gap: var(--space-3);
+    align-items: stretch;
+  }
+  
+  .report-actions {
+    justify-content: stretch;
+  }
+  
+  .report-actions button {
+    flex: 1;
+  }
+}
+
+@media (max-width: 480px) {
+  .processing-timeline {
+    padding: var(--space-4);
+  }
+  
+  .report-header {
+    padding: var(--space-4);
+  }
+  
+  .progress-summary {
+    flex-direction: column;
+    gap: var(--space-2);
+    align-items: stretch;
+  }
+  
+  .timeline-step {
+    margin-left: calc(-1 * var(--space-2));
+    margin-right: calc(-1 * var(--space-2));
+    padding: var(--space-2);
+  }
+  
+  .step-connector {
+    width: 20px;
+  }
+  
+  .step-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 0.7rem;
+  }
+}

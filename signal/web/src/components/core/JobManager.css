@@ -1,0 +1,401 @@
+.job-manager {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.manager-header {
+  padding: var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-6);
+}
+
+.header-info .text-heading {
+  color: var(--color-primary);
+  margin-bottom: var(--space-2);
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.9rem;
+  color: var(--color-border);
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-border);
+}
+
+.status-indicator.connected {
+  background: #22c55e;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.queue-stats {
+  display: flex;
+  gap: var(--space-5);
+}
+
+.stat-item {
+  text-align: center;
+  min-width: 60px;
+}
+
+.stat-value {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--color-border);
+  margin-top: var(--space-1);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.manager-controls {
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-secondary);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-6);
+}
+
+.filter-controls {
+  flex: 1;
+}
+
+.filter-controls select {
+  min-width: 150px;
+}
+
+.queue-priorities h4 {
+  color: var(--color-primary);
+  font-size: 0.9rem;
+  margin-bottom: var(--space-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.priority-grid {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.priority-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.priority-name {
+  font-size: 0.8rem;
+  color: var(--color-border);
+}
+
+.priority-count {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.job-list {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.job-item {
+  border-left: 4px solid var(--state-color);
+  background: var(--color-surface);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.job-item:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.job-item.selected {
+  background: rgba(0, 0, 0, 0.02);
+  box-shadow: inset 0 0 0 1px var(--state-color);
+}
+
+.job-item + .job-item {
+  border-top: 1px solid var(--color-border);
+}
+
+.job-header {
+  padding: var(--space-4) var(--space-6);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.job-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+  min-width: 0;
+}
+
+.job-icon {
+  font-size: 1.2rem;
+  opacity: 0.7;
+}
+
+.job-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.job-id {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--color-border);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.job-type {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--color-primary);
+}
+
+.job-priority {
+  font-size: 0.8rem;
+  color: var(--color-border);
+}
+
+.job-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+}
+
+.job-state {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--state-color);
+  padding: 2px var(--space-2);
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 2px;
+}
+
+.job-time {
+  font-size: 0.8rem;
+  color: var(--color-border);
+}
+
+.job-attempts {
+  font-size: 0.8rem;
+  color: #f59e0b;
+  font-weight: 500;
+}
+
+.job-progress {
+  padding: 0 var(--space-6) var(--space-4);
+}
+
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: var(--space-2);
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--state-color);
+  transition: width 0.5s ease;
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 0.9rem;
+}
+
+.progress-phase {
+  color: var(--color-primary);
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.progress-message {
+  color: var(--color-border);
+  flex: 1;
+  text-align: center;
+}
+
+.progress-percent {
+  font-family: var(--font-mono);
+  color: var(--color-border);
+  font-weight: 600;
+}
+
+.job-error {
+  padding: 0 var(--space-6) var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.error-icon {
+  color: #ef4444;
+}
+
+.error-message {
+  color: #dc2626;
+  font-size: 0.9rem;
+  background: rgba(239, 68, 68, 0.1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: 2px;
+  flex: 1;
+}
+
+.job-actions {
+  padding: var(--space-3) var(--space-6) var(--space-4);
+  display: flex;
+  gap: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-secondary);
+}
+
+.job-actions button {
+  padding: var(--space-2) var(--space-4);
+  font-size: 0.9rem;
+}
+
+.empty-state {
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--color-border);
+}
+
+.empty-icon {
+  font-size: 3rem;
+  margin-bottom: var(--space-4);
+  opacity: 0.5;
+}
+
+.empty-text {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--color-primary);
+  margin-bottom: var(--space-2);
+}
+
+.empty-subtext {
+  font-size: 0.9rem;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .manager-header {
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  
+  .queue-stats {
+    align-self: stretch;
+    justify-content: space-around;
+  }
+  
+  .manager-controls {
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  
+  .priority-grid {
+    justify-content: space-around;
+  }
+  
+  .job-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+  
+  .job-info {
+    align-items: flex-start;
+  }
+  
+  .job-status {
+    align-items: flex-start;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+  
+  .progress-info {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+  
+  .progress-message {
+    text-align: left;
+  }
+  
+  .job-actions {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .manager-header,
+  .manager-controls,
+  .job-header {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+  
+  .job-progress,
+  .job-error,
+  .job-actions {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+  
+  .job-details {
+    min-width: 0;
+  }
+  
+  .job-id {
+    max-width: 200px;
+  }
+}

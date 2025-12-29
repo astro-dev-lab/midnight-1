@@ -173,6 +173,142 @@ async function detectPeaks(filePath) {
 }
 
 /**
+ * Analyze spectral characteristics of audio
+ * @param {string} filePath - Path to audio file
+ * @returns {Promise<Object>} - Spectral analysis data
+ */
+async function analyzeSpectrum(filePath) {
+  const args = [
+    '-i', filePath,
+    '-af', 'aspectralstats=measure=all:reset=1',
+    '-f', 'null',
+    '-'
+  ];
+  
+  try {
+    const { stderr } = await execCommand(FFMPEG_PATH, args);
+    
+    // Parse spectral statistics
+    const centroidMatch = stderr.match(/Spectral centroid:\s*([\d.]+)/);
+    const spreadMatch = stderr.match(/Spectral spread:\s*([\d.]+)/);
+    const rolloffMatch = stderr.match(/Spectral rolloff:\s*([\d.]+)/);
+    const flatnessMatch = stderr.match(/Spectral flatness:\s*([\d.]+)/);
+    const crestMatch = stderr.match(/Spectral crest:\s*([\d.]+)/);
+    
+    return {
+      centroid: centroidMatch ? parseFloat(centroidMatch[1]) : null,
+      spread: spreadMatch ? parseFloat(spreadMatch[1]) : null,
+      rolloff: rolloffMatch ? parseFloat(rolloffMatch[1]) : null,
+      flatness: flatnessMatch ? parseFloat(flatnessMatch[1]) : null,
+      crest: crestMatch ? parseFloat(crestMatch[1]) : null
+    };
+  } catch (error) {
+    console.error('[AudioProcessor] Spectral analysis failed:', error.message);
+    return {
+      centroid: null,
+      spread: null,
+      rolloff: null,
+      flatness: null,
+      crest: null,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Analyze stereo width and imaging
+ * @param {string} filePath - Path to audio file
+ * @returns {Promise<Object>} - Stereo analysis data
+ */
+async function analyzeStereoWidth(filePath) {
+  const args = [
+    '-i', filePath,
+    '-af', 'astats=metadata=1:measure_overall=Overall_level',
+    '-map', '0:a',
+    '-f', 'null',
+    '-'
+  ];
+  
+  try {
+    const { stderr } = await execCommand(FFMPEG_PATH, args);
+    
+    // Parse stereo characteristics
+    const leftMatch = stderr.match(/Left channel level:\s*([-\d.]+)/);
+    const rightMatch = stderr.match(/Right channel level:\s*([-\d.]+)/);
+    const balanceMatch = stderr.match(/Stereo balance:\s*([-\d.]+)/);
+    
+    const leftLevel = leftMatch ? parseFloat(leftMatch[1]) : 0;
+    const rightLevel = rightMatch ? parseFloat(rightMatch[1]) : 0;
+    const balance = balanceMatch ? parseFloat(balanceMatch[1]) : 0;
+    
+    // Calculate stereo width (simplified metric)
+    const width = Math.abs(leftLevel - rightLevel) / Math.max(Math.abs(leftLevel), Math.abs(rightLevel), 1);
+    
+    return {
+      leftLevel,
+      rightLevel,
+      balance,
+      width: Math.min(width * 2, 2.0), // Normalize to 0-2 range
+      monoCompatible: Math.abs(balance) < 0.3
+    };
+  } catch (error) {
+    console.error('[AudioProcessor] Stereo analysis failed:', error.message);
+    return {
+      leftLevel: null,
+      rightLevel: null,
+      balance: null,
+      width: null,
+      monoCompatible: null,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Analyze phase correlation for mono compatibility
+ * @param {string} filePath - Path to audio file
+ * @returns {Promise<Object>} - Phase correlation data
+ */
+async function analyzePhaseCorrelation(filePath) {
+  const args = [
+    '-i', filePath,
+    '-af', 'aphasemeter=rate=1:duration=0',
+    '-f', 'null',
+    '-'
+  ];
+  
+  try {
+    const { stderr } = await execCommand(FFMPEG_PATH, args);
+    
+    // Parse phase correlation
+    const phaseMatch = stderr.match(/Phase:\s*([-\d.]+)/);
+    const correlation = phaseMatch ? parseFloat(phaseMatch[1]) : null;
+    
+    let compatibility = 'unknown';
+    if (correlation !== null) {
+      if (correlation > 0.9) compatibility = 'excellent';
+      else if (correlation > 0.7) compatibility = 'good';
+      else if (correlation > 0.3) compatibility = 'fair';
+      else compatibility = 'poor';
+    }
+    
+    return {
+      correlation,
+      monoCompatibility: compatibility,
+      hasPhaseIssues: correlation !== null && correlation < 0.3
+    };
+  } catch (error) {
+    console.error('[AudioProcessor] Phase analysis failed:', error.message);
+    return {
+      correlation: null,
+      monoCompatibility: 'unknown',
+      hasPhaseIssues: false,
+      error: error.message
+    };
+  }
+}
+
+/**
  * Full audio analysis combining all metrics
  * @param {string} filePath - Path to audio file
  * @returns {Promise<Object>} - Complete analysis
@@ -181,21 +317,117 @@ async function analyzeAudio(filePath) {
   const startTime = Date.now();
   
   // Run all analyses in parallel
-  const [info, loudness, peaks] = await Promise.all([
+  const [info, loudness, peaks, spectral, stereo, phase] = await Promise.all([
     getAudioInfo(filePath),
     analyzeLoudness(filePath),
-    detectPeaks(filePath)
+    detectPeaks(filePath),
+    analyzeSpectrum(filePath),
+    analyzeStereoWidth(filePath),
+    analyzePhaseCorrelation(filePath)
   ]);
   
   const analysisTime = Date.now() - startTime;
+  
+  // Identify problems based on analysis
+  const problems = identifyProblems({ info, loudness, peaks, spectral, stereo, phase });
   
   return {
     info,
     loudness,
     peaks,
+    spectral,
+    stereo,
+    phase,
+    problems,
     analysisTime,
     analyzedAt: new Date().toISOString()
   };
+}
+
+/**
+ * Identify audio problems based on analysis data
+ * @param {Object} analysis - Complete analysis data
+ * @returns {Array<Object>} - List of identified problems
+ */
+function identifyProblems(analysis) {
+  const problems = [];
+  const { info, loudness, peaks, spectral, stereo, phase } = analysis;
+  
+  // Loudness compliance issues
+  if (loudness.integratedLoudness && loudness.integratedLoudness > -6) {
+    problems.push({
+      code: 'TOO_LOUD',
+      severity: 'high',
+      category: 'LOUDNESS',
+      description: `Integrated loudness of ${loudness.integratedLoudness.toFixed(1)} LUFS exceeds streaming standards`,
+      recommendation: 'Normalize to -14 LUFS for streaming compatibility'
+    });
+  }
+  
+  if (loudness.truePeak && loudness.truePeak > -1.0) {
+    problems.push({
+      code: 'TRUE_PEAK_VIOLATION',
+      severity: 'high',
+      category: 'PEAKS',
+      description: `True peak at ${loudness.truePeak.toFixed(1)} dBTP risks digital clipping`,
+      recommendation: 'Apply true peak limiting to -1.0 dBTP or lower'
+    });
+  }
+  
+  // Spectral balance issues
+  if (spectral.centroid && spectral.centroid < 1500) {
+    problems.push({
+      code: 'MUDDY_MIX',
+      severity: 'medium',
+      category: 'FREQUENCY',
+      description: 'Low spectral centroid indicates muddy or dark mix',
+      recommendation: 'Enhance upper midrange frequencies for clarity'
+    });
+  }
+  
+  if (spectral.flatness && spectral.flatness < 0.3) {
+    problems.push({
+      code: 'TONAL_IMBALANCE',
+      severity: 'medium',
+      category: 'FREQUENCY',
+      description: 'Poor spectral flatness indicates frequency imbalance',
+      recommendation: 'Apply corrective EQ to balance frequency response'
+    });
+  }
+  
+  // Stereo and phase issues
+  if (phase.correlation !== null && phase.correlation < 0.3) {
+    problems.push({
+      code: 'MONO_INCOMPATIBLE',
+      severity: 'critical',
+      category: 'STEREO',
+      description: `Phase correlation of ${phase.correlation.toFixed(2)} indicates severe mono incompatibility`,
+      recommendation: 'Adjust stereo imaging to improve phase coherence'
+    });
+  }
+  
+  if (stereo.width && stereo.width < 0.3) {
+    problems.push({
+      code: 'NARROW_STEREO',
+      severity: 'low',
+      category: 'STEREO',
+      description: 'Narrow stereo width may sound mono-like',
+      recommendation: 'Consider subtle stereo enhancement for wider image'
+    });
+  }
+  
+  // Dynamic range issues
+  if (peaks.dynamicRange && peaks.dynamicRange < 4) {
+    problems.push({
+      code: 'OVER_COMPRESSED',
+      severity: 'medium',
+      category: 'DYNAMICS',
+      description: `Dynamic range of ${peaks.dynamicRange.toFixed(1)} DR indicates over-compression`,
+      recommendation: 'Reduce compression or use parallel processing'
+    });
+  }
+  
+  return problems;
 }
 
 // ============================================================================
@@ -428,6 +660,12 @@ module.exports = {
   normalizeLoudness,
   convertFormat,
   masterAudio,
+  
+  // Enhanced Analysis Functions
+  analyzeSpectrum,
+  analyzeStereoWidth,
+  analyzePhaseCorrelation,
+  identifyProblems,
   
   // Helpers
   resolveFilePath,

@@ -12,6 +12,9 @@ const { config } = require('./config');
 const { RegisterSchema, LoginSchema, PingCreateSchema, PingUpdateSchema, validate } = require('./validators');
 const errorHandler = require('./middleware/error');
 const { createProjectRoutes, createAssetRoutes, createJobRoutes, createDeliveryRoutes } = require('./routes');
+const audioRoutes = require('./api/audio');
+const jobQueueRoutes = require('./api/jobs');
+const searchRoutes = require('./api/search');
 
 // Enable BigInt serialization to JSON (Prisma uses BigInt for large integers)
 BigInt.prototype.toJSON = function() {
@@ -400,6 +403,15 @@ app.use('/api/projects', authenticate, createProjectRoutes(prisma));
 app.use('/api/assets', authenticate, createAssetRoutes(prisma));
 app.use('/api/jobs', authenticate, createJobRoutes(prisma));
 app.use('/api/deliveries', authenticate, createDeliveryRoutes(prisma));
+
+// Mount audio processing routes
+app.use('/api', audioRoutes);
+
+// Mount job queue routes
+app.use('/api/jobs', jobQueueRoutes);
+
+// Mount search routes
+app.use('/api/search', searchRoutes);
 
 // SSE endpoint for real-time job updates
 const { createJobEventsRouter } = require('./services/jobEvents');

@@ -1,0 +1,100 @@
+/* Glass Box Audio Visualization Styling */
+
+.audio-visualization {
+  /* Swiss Precision: Clean container */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
+  
+  /* German Engineering: Robust structure */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  
+  /* American Rapper: Bold presence */
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.visualization-canvas {
+  /* Glass Box: Transparent rendering */
+  background: transparent;
+  display: block;
+  image-rendering: pixelated; /* Sharp pixels for precise data */
+}
+
+/* Type-specific styling */
+.audio-visualization.spectrum {
+  background: linear-gradient(180deg, 
+    rgba(0, 255, 136, 0.1) 0%, 
+    rgba(0, 136, 255, 0.1) 50%, 
+    rgba(136, 0, 255, 0.1) 100%);
+}
+
+.audio-visualization.levels {
+  background: linear-gradient(90deg,
+    rgba(0, 255, 136, 0.05) 0%,
+    rgba(255, 136, 0, 0.05) 70%,
+    rgba(255, 0, 68, 0.05) 100%);
+}
+
+.audio-visualization.stereo {
+  background: radial-gradient(circle at center,
+    rgba(0, 255, 136, 0.1) 0%,
+    rgba(0, 136, 255, 0.05) 50%,
+    transparent 100%);
+}
+
+.audio-visualization.phase {
+  background: conic-gradient(from 0deg at center,
+    rgba(255, 0, 68, 0.1) 0deg,
+    rgba(255, 136, 0, 0.1) 90deg,
+    rgba(0, 255, 136, 0.1) 180deg,
+    rgba(0, 136, 255, 0.1) 270deg,
+    rgba(255, 0, 68, 0.1) 360deg);
+}
+
+/* Interactive states */
+.audio-visualization:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 
+    0 12px 48px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* Responsive behavior */
+@media (max-width: 768px) {
+  .audio-visualization {
+    border-radius: 8px;
+  }
+}
+
+/* High contrast support */
+@media (prefers-contrast: high) {
+  .audio-visualization {
+    border-width: 2px;
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+  
+  .visualization-canvas {
+    filter: contrast(1.5);
+  }
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .audio-visualization {
+    background: rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .audio-visualization {
+    transition: none;
+  }
+}
