@@ -1,8 +1,8 @@
-import express from 'express';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs/promises';
-import { analyzeAudio, analyzeSpectrum, analyzeStereoWidth, analyzePhaseCorrelation, identifyProblems } from '../services/audioProcessor.js';
+const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs/promises');
+const { analyzeAudio, analyzeSpectrum, analyzeStereoWidth, analyzePhaseCorrelation, identifyProblems } = require('../services/audioProcessor.js');
 
 const router = express.Router();
 
@@ -303,4 +303,4 @@ function buildProcessingCommand(inputPath, outputPath, config) {
   return args;
 }
 
-export default router;
+module.exports = router;

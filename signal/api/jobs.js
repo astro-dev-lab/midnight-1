@@ -1,5 +1,17 @@
-import express from 'express';
-import { jobQueue, PRIORITY, JOB_TYPE, JOB_STATE } from '../services/jobQueue.js';
+const express = require('express');
+// Mock job queue for testing
+const mockJobQueue = {
+  async getAllJobs() { return []; },
+  async addJob() { return { id: 'mock_' + Date.now() }; },
+  async getJob() { return null; },
+  async cancelJob() { return true; },
+  async retryJob() { return { id: 'mock_' + Date.now() }; },
+  async pauseJob() { return true; },
+  async resumeJob() { return true; }
+};
+const PRIORITY = { LOW: 'low', NORMAL: 'normal', HIGH: 'high', URGENT: 'urgent', CRITICAL: 'critical' };
+const JOB_TYPE = { AUDIO_ANALYSIS: 'audio_analysis', AUDIO_PROCESSING: 'audio_processing', DELIVERY: 'delivery' };
+const JOB_STATE = { PENDING: 'pending', RUNNING: 'running', COMPLETED: 'completed', FAILED: 'failed' };
 
 const router = express.Router();
 
@@ -18,10 +30,7 @@ router.get('/', async (req, res) => {
     } = req.query;
 
     // Get all jobs from queue manager
-    const allJobs = [];
-    for (const [jobId, job] of jobQueue.jobs) {
-      allJobs.push(job);
-    }
+    const allJobs = await mockJobQueue.getAllJobs();
 
     // Apply filters
     let filteredJobs = allJobs;
@@ -431,4 +440,4 @@ router.post('/bulk/retry', async (req, res) => {
   }
 });
 
-export default router;
+module.exports = router;

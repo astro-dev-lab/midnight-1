@@ -1,4 +1,4 @@
-import express from 'express';
+const express = require('express');
 
 const router = express.Router();
 
@@ -489,4 +489,4 @@ function levenshteinDistance(str1, str2) {
   return matrix[str2.length][str1.length];
 }
 
-export default router;
+module.exports = router;
