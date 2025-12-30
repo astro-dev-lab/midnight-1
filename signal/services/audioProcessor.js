@@ -21,6 +21,9 @@ const sampleRateNormalizer = require('./sampleRateNormalizer');
 // Channel topology detector
 const channelTopologyDetector = require('./channelTopologyDetector');
 
+// DC offset detector
+const dcOffsetDetector = require('./dcOffsetDetector');
+
 // ============================================================================
 // Configuration
 // ============================================================================
@@ -353,20 +356,21 @@ async function analyzeAudio(filePath, options = {}) {
  */
 async function analyzeAudioInternal(filePath, startTime) {
   // Run all analyses in parallel
-  const [info, loudness, peaks, spectral, stereo, phase, topology] = await Promise.all([
+  const [info, loudness, peaks, spectral, stereo, phase, topology, dcOffset] = await Promise.all([
     getAudioInfo(filePath),
     analyzeLoudness(filePath),
     detectPeaks(filePath),
     analyzeSpectrum(filePath),
     analyzeStereoWidth(filePath),
     analyzePhaseCorrelation(filePath),
-    channelTopologyDetector.detectTopology(filePath)
+    channelTopologyDetector.detectTopology(filePath),
+    dcOffsetDetector.detectDCOffset(filePath)
   ]);
   
   const analysisTime = Date.now() - startTime;
   
   // Identify problems based on analysis
-  const problems = identifyProblems({ info, loudness, peaks, spectral, stereo, phase, topology });
+  const problems = identifyProblems({ info, loudness, peaks, spectral, stereo, phase, topology, dcOffset });
   
   return {
     info,
@@ -376,6 +380,7 @@ async function analyzeAudioInternal(filePath, startTime) {
     stereo,
     phase,
     topology,
+    dcOffset,
     problems,
     analysisTime,
     analyzedAt: new Date().toISOString()
@@ -389,7 +394,7 @@ async function analyzeAudioInternal(filePath, startTime) {
  */
 function identifyProblems(analysis) {
   const problems = [];
-  const { info, loudness, peaks, spectral, stereo, phase, topology } = analysis;
+  const { info, loudness, peaks, spectral, stereo, phase, topology, dcOffset } = analysis;
   
   // Loudness compliance issues
   if (loudness.integratedLoudness && loudness.integratedLoudness > -6) {
@@ -472,6 +477,22 @@ function identifyProblems(analysis) {
       category: 'CHANNEL',
       description: 'Asset appears to be Mid-Side encoded',
       recommendation: 'Decode to L/R stereo before distribution if not intended'
+    });
+  }
+  
+  // DC offset issues
+  if (dcOffset && dcOffset.hasOffset) {
+    const severityMap = {
+      'MINOR': 'low',
+      'MODERATE': 'medium',
+      'SEVERE': 'high'
+    };
+    problems.push({
+      code: 'DC_OFFSET_DETECTED',
+      severity: severityMap[dcOffset.severity] || 'low',
+      category: 'SIGNAL',
+      description: `DC offset detected (${dcOffset.overallOffsetPercent || 'unknown'})`,
+      recommendation: dcOffset.recommendation || 'Apply DC offset correction before processing'
     });
   }
   
@@ -735,6 +756,9 @@ module.exports = {
   
   // Channel topology detection
   channelTopologyDetector,
+  
+  // DC offset detection
+  dcOffsetDetector,
   
   // Constants
   STORAGE_BASE
