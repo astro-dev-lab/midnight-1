@@ -24,6 +24,9 @@ const channelTopologyDetector = require('./channelTopologyDetector');
 // DC offset detector
 const dcOffsetDetector = require('./dcOffsetDetector');
 
+// Headroom estimator
+const headroomEstimator = require('./headroomEstimator');
+
 // ============================================================================
 // Configuration
 // ============================================================================
@@ -356,7 +359,7 @@ async function analyzeAudio(filePath, options = {}) {
  */
 async function analyzeAudioInternal(filePath, startTime) {
   // Run all analyses in parallel
-  const [info, loudness, peaks, spectral, stereo, phase, topology, dcOffset] = await Promise.all([
+  const [info, loudness, peaks, spectral, stereo, phase, topology, dcOffset, headroom] = await Promise.all([
     getAudioInfo(filePath),
     analyzeLoudness(filePath),
     detectPeaks(filePath),
@@ -364,13 +367,14 @@ async function analyzeAudioInternal(filePath, startTime) {
     analyzeStereoWidth(filePath),
     analyzePhaseCorrelation(filePath),
     channelTopologyDetector.detectTopology(filePath),
-    dcOffsetDetector.detectDCOffset(filePath)
+    dcOffsetDetector.detectDCOffset(filePath),
+    headroomEstimator.estimateHeadroom(filePath, { includeTruePeak: false, includeRms: false })
   ]);
   
   const analysisTime = Date.now() - startTime;
   
   // Identify problems based on analysis
-  const problems = identifyProblems({ info, loudness, peaks, spectral, stereo, phase, topology, dcOffset });
+  const problems = identifyProblems({ info, loudness, peaks, spectral, stereo, phase, topology, dcOffset, headroom });
   
   return {
     info,
@@ -381,6 +385,7 @@ async function analyzeAudioInternal(filePath, startTime) {
     phase,
     topology,
     dcOffset,
+    headroom,
     problems,
     analysisTime,
     analyzedAt: new Date().toISOString()
@@ -394,7 +399,7 @@ async function analyzeAudioInternal(filePath, startTime) {
  */
 function identifyProblems(analysis) {
   const problems = [];
-  const { info, loudness, peaks, spectral, stereo, phase, topology, dcOffset } = analysis;
+  const { info, loudness, peaks, spectral, stereo, phase, topology, dcOffset, headroom } = analysis;
   
   // Loudness compliance issues
   if (loudness.integratedLoudness && loudness.integratedLoudness > -6) {
@@ -414,6 +419,33 @@ function identifyProblems(analysis) {
       category: 'PEAKS',
       description: `True peak at ${loudness.truePeak.toFixed(1)} dBTP risks digital clipping`,
       recommendation: 'Apply true peak limiting to -1.0 dBTP or lower'
+    });
+  }
+  
+  // Headroom issues
+  if (headroom && headroom.status === 'CLIPPED') {
+    problems.push({
+      code: 'CLIPPING_DETECTED',
+      severity: 'critical',
+      category: 'HEADROOM',
+      description: 'Asset appears to be clipping (peak at or above 0 dBFS)',
+      recommendation: 'Use source with more headroom or apply de-clipping'
+    });
+  } else if (headroom && headroom.status === 'CRITICAL') {
+    problems.push({
+      code: 'CRITICAL_HEADROOM',
+      severity: 'high',
+      category: 'HEADROOM',
+      description: `Only ${headroom.headroomDb?.toFixed(1)} dB headroom available`,
+      recommendation: 'Apply limiting carefully to avoid clipping during processing'
+    });
+  } else if (headroom && headroom.status === 'EXCESSIVE') {
+    problems.push({
+      code: 'EXCESSIVE_HEADROOM',
+      severity: 'low',
+      category: 'HEADROOM',
+      description: `Excessive headroom (${headroom.headroomDb?.toFixed(1)} dB) - asset may be too quiet`,
+      recommendation: 'Consider normalizing to appropriate loudness level'
     });
   }
   
@@ -759,6 +791,9 @@ module.exports = {
   
   // DC offset detection
   dcOffsetDetector,
+  
+  // Headroom estimation
+  headroomEstimator,
   
   // Constants
   STORAGE_BASE
