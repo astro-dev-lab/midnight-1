@@ -15,6 +15,12 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs').promises;
 
+// Sample rate normalizer for pre-analysis
+const sampleRateNormalizer = require('./sampleRateNormalizer');
+
+// Channel topology detector
+const channelTopologyDetector = require('./channelTopologyDetector');
+
 // ============================================================================
 // Configuration
 // ============================================================================
@@ -311,25 +317,56 @@ async function analyzePhaseCorrelation(filePath) {
 /**
  * Full audio analysis combining all metrics
  * @param {string} filePath - Path to audio file
+ * @param {Object} options - Analysis options
+ * @param {boolean} options.skipNormalization - Skip pre-analysis normalization (default: false)
  * @returns {Promise<Object>} - Complete analysis
  */
-async function analyzeAudio(filePath) {
+async function analyzeAudio(filePath, options = {}) {
+  const { skipNormalization = false } = options;
   const startTime = Date.now();
   
+  // Use normalizer wrapper for consistent analysis across different formats
+  if (!skipNormalization) {
+    return await sampleRateNormalizer.withNormalization(
+      filePath,
+      async (normalizedPath) => {
+        return await analyzeAudioInternal(normalizedPath, startTime);
+      }
+    ).then(({ analysisResult, normalization }) => {
+      // Add normalization metadata to result
+      analysisResult.normalization = {
+        wasNormalized: normalization.wasNormalized,
+        changes: normalization.changes,
+        processingTimeMs: normalization.processingTimeMs,
+        originalInfo: normalization.originalInfo
+      };
+      return analysisResult;
+    });
+  }
+  
+  return await analyzeAudioInternal(filePath, startTime);
+}
+
+/**
+ * Internal analysis implementation (after normalization)
+ * @private
+ */
+async function analyzeAudioInternal(filePath, startTime) {
   // Run all analyses in parallel
-  const [info, loudness, peaks, spectral, stereo, phase] = await Promise.all([
+  const [info, loudness, peaks, spectral, stereo, phase, topology] = await Promise.all([
     getAudioInfo(filePath),
     analyzeLoudness(filePath),
     detectPeaks(filePath),
     analyzeSpectrum(filePath),
     analyzeStereoWidth(filePath),
-    analyzePhaseCorrelation(filePath)
+    analyzePhaseCorrelation(filePath),
+    channelTopologyDetector.detectTopology(filePath)
   ]);
   
   const analysisTime = Date.now() - startTime;
   
   // Identify problems based on analysis
-  const problems = identifyProblems({ info, loudness, peaks, spectral, stereo, phase });
+  const problems = identifyProblems({ info, loudness, peaks, spectral, stereo, phase, topology });
   
   return {
     info,
@@ -338,6 +375,7 @@ async function analyzeAudio(filePath) {
     spectral,
     stereo,
     phase,
+    topology,
     problems,
     analysisTime,
     analyzedAt: new Date().toISOString()
@@ -351,7 +389,7 @@ async function analyzeAudio(filePath) {
  */
 function identifyProblems(analysis) {
   const problems = [];
-  const { info, loudness, peaks, spectral, stereo, phase } = analysis;
+  const { info, loudness, peaks, spectral, stereo, phase, topology } = analysis;
   
   // Loudness compliance issues
   if (loudness.integratedLoudness && loudness.integratedLoudness > -6) {
@@ -413,6 +451,27 @@ function identifyProblems(analysis) {
       category: 'STEREO',
       description: 'Narrow stereo width may sound mono-like',
       recommendation: 'Consider subtle stereo enhancement for wider image'
+    });
+  }
+  
+  // Channel topology issues
+  if (topology && topology.topology === 'DUAL_MONO') {
+    problems.push({
+      code: 'DUAL_MONO_DETECTED',
+      severity: 'low',
+      category: 'CHANNEL',
+      description: 'Asset contains identical left and right channels (dual-mono)',
+      recommendation: 'Convert to mono to reduce file size, or add stereo content'
+    });
+  }
+  
+  if (topology && topology.topology === 'MID_SIDE') {
+    problems.push({
+      code: 'MID_SIDE_ENCODING',
+      severity: 'medium',
+      category: 'CHANNEL',
+      description: 'Asset appears to be Mid-Side encoded',
+      recommendation: 'Decode to L/R stereo before distribution if not intended'
     });
   }
   
@@ -670,6 +729,12 @@ module.exports = {
   // Helpers
   resolveFilePath,
   fileExists,
+  
+  // Pre-analysis normalization
+  sampleRateNormalizer,
+  
+  // Channel topology detection
+  channelTopologyDetector,
   
   // Constants
   STORAGE_BASE
