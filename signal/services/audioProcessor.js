@@ -27,6 +27,12 @@ const dcOffsetDetector = require('./dcOffsetDetector');
 // Headroom estimator
 const headroomEstimator = require('./headroomEstimator');
 
+// Crest factor analyzer
+const crestFactorAnalyzer = require('./crestFactorAnalyzer');
+
+// Loudness analyzer (momentary/short-term/integrated LUFS)
+const loudnessAnalyzer = require('./loudnessAnalyzer');
+
 // ============================================================================
 // Configuration
 // ============================================================================
@@ -359,7 +365,7 @@ async function analyzeAudio(filePath, options = {}) {
  */
 async function analyzeAudioInternal(filePath, startTime) {
   // Run all analyses in parallel
-  const [info, loudness, peaks, spectral, stereo, phase, topology, dcOffset, headroom] = await Promise.all([
+  const [info, loudness, peaks, spectral, stereo, phase, topology, dcOffset, headroom, crestFactor, loudnessDetail] = await Promise.all([
     getAudioInfo(filePath),
     analyzeLoudness(filePath),
     detectPeaks(filePath),
@@ -368,13 +374,15 @@ async function analyzeAudioInternal(filePath, startTime) {
     analyzePhaseCorrelation(filePath),
     channelTopologyDetector.detectTopology(filePath),
     dcOffsetDetector.detectDCOffset(filePath),
-    headroomEstimator.estimateHeadroom(filePath, { includeTruePeak: false, includeRms: false })
+    headroomEstimator.estimateHeadroom(filePath, { includeTruePeak: false, includeRms: false }),
+    crestFactorAnalyzer.quickCheck(filePath),
+    loudnessAnalyzer.quickCheck(filePath)
   ]);
   
   const analysisTime = Date.now() - startTime;
   
   // Identify problems based on analysis
-  const problems = identifyProblems({ info, loudness, peaks, spectral, stereo, phase, topology, dcOffset, headroom });
+  const problems = identifyProblems({ info, loudness, peaks, spectral, stereo, phase, topology, dcOffset, headroom, crestFactor, loudnessDetail });
   
   return {
     info,
@@ -386,6 +394,8 @@ async function analyzeAudioInternal(filePath, startTime) {
     topology,
     dcOffset,
     headroom,
+    crestFactor,
+    loudnessDetail,
     problems,
     analysisTime,
     analyzedAt: new Date().toISOString()
@@ -399,7 +409,7 @@ async function analyzeAudioInternal(filePath, startTime) {
  */
 function identifyProblems(analysis) {
   const problems = [];
-  const { info, loudness, peaks, spectral, stereo, phase, topology, dcOffset, headroom } = analysis;
+  const { info, loudness, peaks, spectral, stereo, phase, topology, dcOffset, headroom, crestFactor, loudnessDetail } = analysis;
   
   // Loudness compliance issues
   if (loudness.integratedLoudness && loudness.integratedLoudness > -6) {
@@ -536,6 +546,52 @@ function identifyProblems(analysis) {
       category: 'DYNAMICS',
       description: `Dynamic range of ${peaks.dynamicRange.toFixed(1)} DR indicates over-compression`,
       recommendation: 'Reduce compression or use parallel processing'
+    });
+  }
+  
+  // Crest factor issues
+  if (crestFactor && crestFactor.status === 'SEVERELY_LIMITED') {
+    problems.push({
+      code: 'SEVERELY_LIMITED_DYNAMICS',
+      severity: 'high',
+      category: 'DYNAMICS',
+      description: `Crest factor of ${crestFactor.crestFactorDb?.toFixed(1)} dB indicates severe limiting`,
+      recommendation: 'Asset is over-processed. Avoid additional limiting to prevent distortion.'
+    });
+  } else if (crestFactor && crestFactor.status === 'HEAVILY_COMPRESSED') {
+    problems.push({
+      code: 'HEAVILY_COMPRESSED_DYNAMICS',
+      severity: 'medium',
+      category: 'DYNAMICS',
+      description: `Crest factor of ${crestFactor.crestFactorDb?.toFixed(1)} dB indicates heavy compression`,
+      recommendation: 'Use minimal limiting. Consider a less processed source if available.'
+    });
+  } else if (crestFactor && crestFactor.status === 'VERY_DYNAMIC') {
+    problems.push({
+      code: 'VERY_DYNAMIC_CONTENT',
+      severity: 'low',
+      category: 'DYNAMICS',
+      description: `Crest factor of ${crestFactor.crestFactorDb?.toFixed(1)} dB indicates highly dynamic content`,
+      recommendation: 'Consider multi-stage limiting for loudness targets.'
+    });
+  }
+  
+  // Momentary/Short-term loudness issues (from loudnessDetail)
+  if (loudnessDetail && loudnessDetail.status === 'TOO_LOUD') {
+    problems.push({
+      code: 'LOUDNESS_TOO_HIGH',
+      severity: 'high',
+      category: 'LOUDNESS',
+      description: `Integrated loudness of ${loudnessDetail.integrated?.toFixed(1)} LUFS exceeds platform target`,
+      recommendation: `Reduce loudness by ${Math.abs(loudnessDetail.gainNeeded || 0).toFixed(1)} dB for compliance`
+    });
+  } else if (loudnessDetail && loudnessDetail.status === 'TOO_QUIET') {
+    problems.push({
+      code: 'LOUDNESS_TOO_LOW',
+      severity: 'medium',
+      category: 'LOUDNESS',
+      description: `Integrated loudness of ${loudnessDetail.integrated?.toFixed(1)} LUFS is below platform target`,
+      recommendation: `Increase loudness by ${Math.abs(loudnessDetail.gainNeeded || 0).toFixed(1)} dB for optimal playback`
     });
   }
   
@@ -794,6 +850,12 @@ module.exports = {
   
   // Headroom estimation
   headroomEstimator,
+  
+  // Crest factor analysis
+  crestFactorAnalyzer,
+  
+  // Loudness analysis (momentary/short-term/integrated LUFS)
+  loudnessAnalyzer,
   
   // Constants
   STORAGE_BASE
