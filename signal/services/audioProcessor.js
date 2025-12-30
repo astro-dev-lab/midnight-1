@@ -33,6 +33,9 @@ const crestFactorAnalyzer = require('./crestFactorAnalyzer');
 // Loudness analyzer (momentary/short-term/integrated LUFS)
 const loudnessAnalyzer = require('./loudnessAnalyzer');
 
+// Temporal density mapper (hook vs verse detection)
+const temporalDensityMapper = require('./temporalDensityMapper');
+
 // ============================================================================
 // Configuration
 // ============================================================================
@@ -856,6 +859,9 @@ module.exports = {
   
   // Loudness analysis (momentary/short-term/integrated LUFS)
   loudnessAnalyzer,
+  
+  // Temporal density mapping (hook vs verse detection)
+  temporalDensityMapper,
   
   // Constants
   STORAGE_BASE
