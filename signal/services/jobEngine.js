@@ -13,6 +13,9 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
+// File integrity validation
+const { validateStoredAsset } = require('./storage');
+
 // Lazy-load job notifications to avoid circular dependency
 let jobNotifications = null;
 function getJobNotifications() {
@@ -217,6 +220,34 @@ async function enqueueJob(jobId) {
   if (invalidInputs.length > 0) {
     await failJob(jobId, ErrorCategory.INGESTION, 'Cannot process FINAL assets');
     throw new Error('Cannot process FINAL assets');
+  }
+  
+  // Validate file integrity for all input assets
+  for (const input of job.inputs) {
+    const asset = input.asset;
+    if (asset.fileKey) {
+      const integrityResult = await validateStoredAsset(asset.fileKey, { 
+        strictMode: true 
+      });
+      
+      if (!integrityResult.valid) {
+        const errorMessages = integrityResult.errors
+          .map(e => e.description)
+          .join('; ');
+        await failJob(
+          jobId, 
+          ErrorCategory.INGESTION, 
+          `Asset integrity check failed for "${asset.name}": ${errorMessages}`
+        );
+        throw new Error(`Asset integrity check failed: ${errorMessages}`);
+      }
+      
+      // Log warnings but don't fail
+      if (integrityResult.warnings && integrityResult.warnings.length > 0) {
+        console.warn(`[JobEngine] Asset "${asset.name}" has warnings:`, 
+          integrityResult.warnings.map(w => w.description).join('; '));
+      }
+    }
   }
   
   // Validate preset

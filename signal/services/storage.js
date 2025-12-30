@@ -14,6 +14,12 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+const { 
+  validateFileIntegrity, 
+  quickValidate, 
+  validateHeader 
+} = require('./fileIntegrityValidator');
+
 /**
  * Generate UUID v4 using native crypto
  * @returns {string}
@@ -357,6 +363,128 @@ function createUploadMiddleware(options = {}) {
 // Default upload middleware for audio files
 const uploadAudio = createUploadMiddleware();
 
+// ============================================================================
+// File Integrity Validation
+// ============================================================================
+
+/**
+ * Validate asset upload - combines MIME type check with file integrity validation.
+ * Returns structured error following StudioOS patterns.
+ * 
+ * @param {Object} file - Uploaded file object from multer
+ * @param {Object} options - Validation options
+ * @param {boolean} [options.strictMode=true] - Enable strict validation
+ * @param {boolean} [options.skipIntegrity=false] - Skip deep integrity check
+ * @returns {Promise<Object>} - Validation result
+ */
+async function validateAssetUpload(file, options = {}) {
+  const { strictMode = true, skipIntegrity = false } = options;
+  
+  const result = {
+    valid: true,
+    errors: [],
+    warnings: [],
+    metadata: null
+  };
+  
+  // Check 1: MIME type (fast rejection)
+  if (!isAllowedMimeType(file.mimetype)) {
+    result.valid = false;
+    result.errors.push({
+      code: 'UNSUPPORTED_FORMAT',
+      category: 'INGESTION',
+      severity: 'critical',
+      description: `The asset format "${file.mimetype}" is not supported.`,
+      recommendation: 'Upload an asset in a supported format: WAV, MP3, FLAC, AAC, OGG, AIFF.'
+    });
+    return result;
+  }
+  
+  // Check 2: File size
+  if (file.size > MAX_FILE_SIZE) {
+    result.valid = false;
+    result.errors.push({
+      code: 'FILE_TOO_LARGE',
+      category: 'INGESTION',
+      severity: 'critical',
+      description: `The asset exceeds the maximum size of ${Math.round(MAX_FILE_SIZE / 1024 / 1024)} MB.`,
+      recommendation: 'Reduce the asset file size or split into smaller segments.'
+    });
+    return result;
+  }
+  
+  // Check 3: Header validation from buffer (if buffer available)
+  if (file.buffer) {
+    const headerResult = validateHeader(file.buffer.slice(0, 16));
+    if (!headerResult.valid) {
+      result.valid = false;
+      result.errors.push(headerResult.error);
+      return result;
+    }
+    result.detectedFormat = headerResult.format;
+  }
+  
+  // Check 4: Full integrity validation (if file is on disk and not skipped)
+  if (file.path && !skipIntegrity) {
+    const integrityResult = await validateFileIntegrity(file.path, { strictMode });
+    
+    if (!integrityResult.valid) {
+      result.valid = false;
+      result.errors.push(...integrityResult.errors);
+      return result;
+    }
+    
+    result.warnings.push(...integrityResult.warnings);
+    result.metadata = integrityResult.metadata;
+    result.checks = integrityResult.checks;
+  }
+  
+  return result;
+}
+
+/**
+ * Validate a stored asset by file key.
+ * Use this to validate assets already in storage before processing.
+ * 
+ * @param {string} fileKey - Storage file key
+ * @param {Object} options - Validation options
+ * @returns {Promise<Object>} - Validation result
+ */
+async function validateStoredAsset(fileKey, options = {}) {
+  const filePath = getFilePath(fileKey);
+  
+  // Check file exists
+  if (!fs.existsSync(filePath)) {
+    return {
+      valid: false,
+      errors: [{
+        code: 'FILE_NOT_FOUND',
+        category: 'INGESTION',
+        severity: 'critical',
+        description: 'The asset could not be located in storage.',
+        recommendation: 'Re-upload the source asset.'
+      }],
+      warnings: [],
+      metadata: null
+    };
+  }
+  
+  // Run full integrity validation
+  return validateFileIntegrity(filePath, options);
+}
+
+/**
+ * Quick validation for asset header only.
+ * Use for fast rejection during streaming uploads.
+ * 
+ * @param {string} fileKey - Storage file key
+ * @returns {Promise<Object>} - Quick validation result
+ */
+async function quickValidateAsset(fileKey) {
+  const filePath = getFilePath(fileKey);
+  return quickValidate(filePath);
+}
+
 module.exports = {
   // Storage operations
   storeFile,
@@ -381,5 +509,10 @@ module.exports = {
   
   // Multer middleware
   createUploadMiddleware,
-  uploadAudio
+  uploadAudio,
+  
+  // File integrity validation
+  validateAssetUpload,
+  validateStoredAsset,
+  quickValidateAsset
 };
