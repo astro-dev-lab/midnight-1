@@ -1,135 +1,193 @@
 # Copilot Instructions for Midnight
 
-- **Repo shape**: Root package [@andrewitsover/midnight](README.md) (Node ESM ORM targeting SQLite/Turso); sample Express service in [signal](signal/README.md); Vite React demo in [signal/web](signal/web/README.md). Library code lives in [src](src), exported via [index.js](index.js) with type definitions in [index.d.ts](index.d.ts).
-- **Build/run**: Library bundles to CJS with `npm run build` (esbuild). SQLite engine expects Node ≥22.13.1. Signal server: `npm install && npm start` in [signal](signal). Web: `npm install && npm run dev` in [signal/web](signal/web).
-- **Table definitions**: Define schema by extending `Table`/`FTSTable`/`ExternalFTSTable` in user code; property names become column names (default type Text). Column helpers and modifiers are symbols generated in [src/tables.js](src/tables.js). `Index`/`Unique`/`Check`/`Cascade`/`References`/`Null` set constraints; computed columns are method calls (see `computeMethods` in [src/methods.js](src/methods.js)) returning symbols. `Attributes()` can declare multi-column indexes/checks after `ReplaceFields()`; FTS tokenizers via `Unicode61`/`Ascii`/`Trigram`.
-- **Client creation**: `Database.getClient({ TableClass1, ... })` processes classes (`process` in [src/tables.js](src/tables.js)) into `schema` and returns a proxied client (`makeClient` in [src/proxy.js](src/proxy.js)). Table proxies expose CRUD (`insert`, `insertMany`, `update`, `upsert`, `delete`, `get`, `many`) plus aggregates, `groupBy`, `exists`, `query`, `first`, and FTS `match`.
-- **Query expressions**: Complex queries use `db.query(c => ({ ... }))` where `c.table.column` yields symbols from [src/symbols.js](src/symbols.js). Supports `select`, `distinct`, `omit`, `join`, `where` (supports `and`/`or`, operator functions from [src/methods.js](src/methods.js)), `groupBy`, `having`, ordering, limits, window functions, CTE-style `subquery`/`use`. Computed columns get expanded via `addAlias` to qualify expressions.
-- **Type handling**: Built-in converters registered in [src/db.js](src/db.js) map boolean/date/json to SQLite-friendly storage; additional types register via `registerTypes`. JSON columns serialize to blob and auto-parse during mapping; parser hooks derive from `columns` metadata in `db.columns` and `db.computed`.
-- **Execution layers**: SQLite implementation ([src/sqlite.js](src/sqlite.js)) keeps read/write handles and a writer lock; `begin/commit/rollback` return proxied tx objects; `batch` executes collected statements in one transaction; `insertMany` uses JSON bulk insert unless blobs detected. Turso adapter ([src/turso.js](src/turso.js)) expects `props.db` with `execute/batch` APIs and supports `sync`.
-- **Migrations**: `getSchema()` returns processed table metadata; `diff(previousSchema)` builds SQL via [src/migrate.js](src/migrate.js), recreating tables when constraints change or columns drop/alter; `SQLiteDatabase.migrate(sql)` wraps DDL in deferred-foreign-key transaction. `toSql`/`indexToSql` live in [src/tables.js](src/tables.js).
-- **Mapping/results**: Query assembly lives in [src/queries.js](src/queries.js) and request processing in [src/requests.js](src/requests.js); rows are mapped through `parse/mapOne/mapMany` ([src/map.js](src/map.js)), auto-returning scalar values when only one column is selected. Placeholders use `$p_n` from [src/utils.js](src/utils.js); `nameToSql` escapes reserved words ([src/reserved.js](src/reserved.js)).
-- **JSON/expressions**: `expressionHandler` in [src/utils.js](src/utils.js) builds SQL fragments for computed `set` clauses or order by; JSON comparison uses `json_extract` paths and `jsonb(...)` casting for inserts/updates. Operator functions like `c => c.not([1,2])` translate to `not in` clauses.
-- **FTS specifics**: `FTSTable` defaults to `rowid` primary key and `unicode61` tokenizer; `ExternalFTSTable` links to a base table and auto-creates triggers to mirror content unless columns are contentless. Avoid empty FTS definitions; at least one column required.
-- **Concurrency/locking**: Write operations on SQLite obtain a single-writer lock (`getWriter` in [src/sqlite.js](src/sqlite.js)); batch/tx paths set `tx.isBatch` to defer execution until commit. Prefer `db.batch` or `insertMany` for heavy writes to reduce lock churn.
-- **Error/debug**: `SQLiteDatabase.getError(sql)` prepares statements to surface syntax errors; `Database.needsParsing` can signal if type conversions are required. When adding new compute/compare/window functions, update [src/methods.js](src/methods.js) and return types in [src/types.js](src/types.js).
-- **Non-library subprojects**: `signal` is a bare Express health check; `signal/web` is untouched Vite/React starter. Keep changes minimal unless intentionally extending the sample. **For StudioOS behavior/UI/API in `signal/**`, follow StudioOS specs (7 views in Dashboard One, 5 in Dashboard Two) and do not add views/features outside the docs.**
-- **Style/conventions**: Modules use ES module syntax; keep exports wired through [index.js](index.js). Preserve ASCII column/table names and validation patterns in `verify` in [src/queries.js](src/queries.js). Tests are absent; validate changes via targeted scripts and, for SQLite, small repros using `db.getError` or `db.query`.
+## Architecture Overview
+
+**Midnight** is a Node.js ESM ORM for SQLite/Turso with TypeScript support. No code generation—complex SQL is written directly in JavaScript.
+
+| Component | Path | Purpose |
+|-----------|------|---------|
+| ORM Library | `src/` | Core ORM exported via `index.js` |
+| Types | `index.d.ts` | Full TypeScript definitions |
+| Signal API | `signal/` | Express service using Prisma (StudioOS backend) |
+| Web Demo | `signal/web/` | Vite/React starter |
+| Test Scripts | `scripts/` | Manual validation scripts (no test runner) |
+
+## Build & Run Commands
+
+```bash
+# Library (root): Build CJS bundle
+npm run build    # → esbuild → index.cjs
+
+# Signal server
+cd signal && npm install && npm start
+npm test         # Jest tests (run with --runInBand)
+
+# Web frontend
+cd signal/web && npm install && npm run dev
+```
+
+**Requirements**: Node ≥22.13.1 for SQLite engine
+
+## Core Patterns
+
+### Table Definitions
+Extend `Table` (or `SoftDeleteTable`/`FTSTable`/`ExternalFTSTable`). Property names become columns (default: Text):
+
+```js
+class Items extends Table {
+  name;                              // Text column
+  count = this.Default(0);           // Int with default
+  price = this.Null(this.Real);      // Nullable Real
+  forestId = this.Cascade(Forests);  // FK with cascade delete
+  computed = this.Concat(this.name, ' - ', this.status);  // Computed column
+}
+```
+
+Modifiers: `Index`, `Unique`, `Check`, `Cascade`, `References`, `Null`, `Primary`
+
+### Client API
+```js
+const db = database.getClient({ Items, Categories });
+const sql = db.diff();        // Generate migration SQL
+await db.migrate(sql);        // Apply migration
+
+// Table-level CRUD
+await db.items.insert({ name: 'foo' });
+await db.items.get({ id: 1 });
+await db.items.many({ status: 'active' });
+await db.items.update({ values: {...}, where: {...} });
+await db.items.delete({ id: 1 });
+
+// Complex queries
+await db.query(c => ({
+  select: { ...c.items, category: c.categories.name },
+  join: [c.items.categoryId, c.categories.id],
+  where: { [c.items.id]: [1, 2, 3] }
+}));
+```
+
+### Full-Text Search (FTS)
+```js
+// Standalone FTS table
+class Emails extends FTSTable {
+  subject;
+  body;
+  tokenizer = this.Unicode61({ removeDiacritics: true });
+}
+
+// External FTS (mirrors a base table with triggers)
+class ForestSearches extends ExternalFTSTable {
+  base = Forests;
+  name;  // Columns to index from base table
+}
+
+// Querying FTS
+const results = await db.emails.match('search term');
+```
+
+Tokenizers: `Unicode61`, `Ascii`, `Trigram`
+
+### JSON Columns
+```js
+class Settings extends Table {
+  config = this.Json;  // Stored as blob, auto-parsed on read
+}
+
+// Query with json_extract
+await db.query(c => ({
+  select: { value: c.Extract(c.settings.config, '$.theme') },
+  where: c => c.config.nested.key.eq('value')  // Deep path access
+}));
+```
+
+JSON uses `jsonb()` for inserts/updates and `json_extract()` for queries.
+
+### Turso/libSQL Support
+```js
+import { TursoDatabase } from '@andrewitsover/midnight';
+
+const db = new TursoDatabase({
+  db: tursoClient,  // libSQL client with execute/batch APIs
+});
+await db.sync();  // Sync with remote
+```
+
+## Key Files Reference
+- `src/tables.js` — Table class, column modifiers, schema processing
+- `src/proxy.js` — `makeClient()`, CRUD method wiring
+- `src/queries.js` — SQL generation, query building
+- `src/methods.js` — `computeMethods`/`compareMethods`/`windowMethods`
+- `src/sqlite.js` — SQLite implementation with writer lock
+- `src/turso.js` — Turso/libSQL adapter
+- `src/migrate.js` — Schema diff and migration generation
+
+## Testing & Validation
+
+**ORM Library** — No test runner; use scripts in `scripts/`:
+```bash
+node scripts/crud-test.js       # Core CRUD operations
+node scripts/fts-test.js        # Full-text search
+node scripts/migrate-test.js    # Schema migrations
+node scripts/joins-test.js      # Complex joins
+node scripts/transaction-test.js # Transactions and batching
+```
+
+Use `db.getError(sql)` to validate SQL syntax during development.
+
+**Signal API** — Jest tests in `signal/__tests__/`:
+```bash
+cd signal && npm test
+```
+Key test files: `auth.test.js`, `rbac.test.js`, `stateMachine.test.js`, `jobEngine.test.js`
+
+## Concurrency
+SQLite uses single-writer lock (`getWriter` in sqlite.js). For heavy writes:
+- Use `db.batch()` for transactional writes
+- Prefer `insertMany()` over loops
 
 ---
 
-## StudioOS Guardrails (Mandatory)
+## StudioOS Guardrails (signal/** only)
 
-**Applies to:** UI strings, assistant responses, API request/response payloads in `signal/**`.
+**Applies to:** All UI strings, assistant output, and API responses in `signal/**`.
 
-### Document Authority & Precedence
+### Document Authority
 
-The complete StudioOS specification lives in `signal/docs/STUDIOOS_*.md`. When implementing or suggesting features, resolve conflicts using this precedence order:
-
+Specification lives in `signal/docs/STUDIOOS_*.md`. Precedence:
 1. `STUDIOOS_ASSISTANT_HANDBOOK.md`
-2. Functional Specs (Dashboard-specific)
-3. State & Lifecycle Specs
-4. RBAC Matrices
-5. Interaction & Approval Contracts
-6. Transparency Charters
-7. Error & Support Docs
-8. Language Usage
+2. Functional Specs → RBAC → State/Lifecycle → Interaction → Transparency → Error docs → Language
 
-### Closed-World Rule
-
-**If a feature, view, action, or behavior is not explicitly defined in `signal/docs/STUDIOOS_*.md`, it does not exist and must not be implemented.**
-
-When uncertain, deny. When ambiguous, choose the most restrictive interpretation.
-
-Required phrasing when denying:
+**Closed-World Rule**: If not defined in specs, it does not exist. When uncertain, deny with:
 > "This action is not defined in the current StudioOS architecture."
 
-### Forbidden Terminology (Hard Ban)
+### Forbidden vs Approved Terminology
 
-The following terms **must not appear** in UI strings, assistant output, or API responses:
-
+**NEVER use** (hard ban):
 ```
 track, timeline, clip, session, plugin, fader, automation, 
-channel, bus, insert, rack, meter (when implying manipulation),
-tweak, adjust live, play with, dial in, fine-tune manually,
-drag and drop (for audio manipulation), scrub (outside playback-only review)
+channel, bus, insert, rack, meter, tweak, adjust, dial in, fine-tune
 ```
 
-### Approved Terminology
-
-Use only these terms for user-facing content:
-
+**ALWAYS use**:
 ```
 asset, job, transformation, output, version, report, preset, 
-parameter, workflow, delivery, approval, review, lineage, audit,
-confidence, analyze, generate, prepare, normalize, convert, 
-split, deliver, re-run, approve, reject
+parameter, workflow, delivery, approval, review, lineage, audit
 ```
-
-### Mandatory Gating Checklist
-
-Before suggesting or implementing any action in `signal/**`, verify in order:
-
-1. **Functional Specs** — Is this action defined?
-2. **RBAC** — Is it allowed for this role?
-3. **State** — Is it valid for the current entity state?
-4. **Interaction Rules** — Is the interaction pattern permitted?
-5. **Language Compliance** — Does it use approved terminology only?
-
-If any answer is "no" or "undefined" → **deny**.
 
 ### State Machine Compliance
 
-All entity states must follow the canonical models:
+| Entity | Valid States |
+|--------|--------------|
+| Project | Draft → Processing → Ready → Delivered |
+| Asset | Raw → Derived → Final |
+| Job | Queued → Running → Completed \| Failed |
 
-| Entity | Valid States | Invalid Transitions |
-|--------|--------------|---------------------|
-| Project | Draft → Processing → Ready → Delivered | Draft → Delivered (bypassing Processing) |
-| Asset | Raw → Derived → Final | Raw → Final (must go through Derived) |
-| Job | Queued → Running → Completed \| Failed | Any mutation after Completed |
+Never suggest invalid state transitions.
 
-Assistants **must not** suggest invalid state transitions.
+### Gating Checklist (before any `signal/**` action)
+1. **Functional Specs** — Is action defined?
+2. **RBAC** — Allowed for this role?
+3. **State** — Valid for current entity state?
+4. **Language** — Uses approved terminology?
 
-### Error & Recovery Language
-
-When surfacing errors in UI or assistant responses:
-
-- Name the canonical error category (Ingestion, Processing, Output, Delivery, System)
-- State impact plainly
-- Offer only permitted recovery actions from `STUDIOOS_ERROR_RECOVERY_PLAYBOOK.md`
-
-**Forbidden patterns:**
-- "Try again later"
-- "Something went wrong"
-- "We're not sure why…"
-
-**Required pattern:**
-- "The job failed due to [category]. You may [permitted recovery action]."
-
-### Transparency & Report Grounding
-
-- Ground all explanations in processing reports, not speculation
-- Explain *what* and *why*, never *how to tweak*
-- Do not translate reports into DAW language
-- Do not guess internal processing or invent unseen steps
-
-### RBAC Enforcement
-
-Respect role permissions at all times:
-
-| Dashboard One | Basic | Standard | Advanced |
-|---------------|-------|----------|----------|
-| Transform | Preset only | Bounded params | Full params |
-| Approve | ✖ | ✔ | ✔ |
-| Rerun Jobs | ✖ | Limited | ✔ |
-
-| Dashboard Two | Viewer | Approver |
-|---------------|--------|----------|
-| Approve/Reject | ✖ | ✔ |
-| Download | ✖ | ✔ |
-
-Do not suggest actions outside the user's role. Do not imply hidden capabilities.
-
----
-
-If any section is unclear or missing context you need, tell me which parts to refine.
+If any "no" → **deny**.
