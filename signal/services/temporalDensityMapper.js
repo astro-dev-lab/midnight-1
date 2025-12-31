@@ -1061,6 +1061,7 @@ module.exports = {
   // Main functions
   analyzeTemporalDensity,
   quickSectionDetection,
+  quickCheck: quickSectionDetection, // Alias for audioProcessor integration
   
   // Core analysis
   getEnergyTimeline,

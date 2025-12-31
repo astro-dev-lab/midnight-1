@@ -51,6 +51,39 @@ const limiterStressIndex = require('./limiterStressIndex');
 // Gain reduction distribution mapper (where and how often compression occurs)
 const gainReductionMapper = require('./gainReductionMapper');
 
+// Macro-dynamics shape classifier (overall energy arc classification)
+const macroDynamicsClassifier = require('./macroDynamicsClassifier');
+
+// Mono fold-down simulator (L-R correlation and phase cancellation prediction)
+const monoFoldDownSimulator = require('./monoFoldDownSimulator');
+
+// Small speaker translator (bass loss prediction for phones/laptops)
+const smallSpeakerTranslator = require('./smallSpeakerTranslator');
+
+// Club system stress estimator (PA limiter stress, subwoofer excursion risk)
+const clubSystemStressEstimator = require('./clubSystemStressEstimator');
+
+// Car system translator (low-mid buildup, limiter pumping risk)
+const carSystemTranslator = require('./carSystemTranslator');
+
+// Codec stress predictor (MP3/AAC artifact prediction)
+const codecStressPredictor = require('./codecStressPredictor');
+
+// Intersample peak risk estimator (true peak overshoot prediction)
+const intersamplePeakRiskEstimator = require('./intersamplePeakRiskEstimator');
+
+// Clipping propagation detector (upstream vs downstream clipping)
+const clippingPropagationDetector = require('./clippingPropagationDetector');
+
+// Noise floor modulation detector (breathing/pumping artifacts)
+const noiseFloorModulationDetector = require('./noiseFloorModulationDetector');
+
+// Aliasing risk estimator (HF content near Nyquist)
+const aliasingRiskEstimator = require('./aliasingRiskEstimator');
+
+// Artifact accumulation tracker (processing burden score)
+const artifactAccumulationTracker = require('./artifactAccumulationTracker');
+
 // ============================================================================
 // Configuration
 // ============================================================================
@@ -383,7 +416,7 @@ async function analyzeAudio(filePath, options = {}) {
  */
 async function analyzeAudioInternal(filePath, startTime) {
   // Run all analyses in parallel
-  const [info, loudness, peaks, spectral, stereo, phase, topology, dcOffset, headroom, crestFactor, loudnessDetail, temporalDensity, transientSharpness, lowEndMono, spectralBalance, limiterStress, gainReduction] = await Promise.all([
+  const [info, loudness, peaks, spectral, stereo, phase, topology, dcOffset, headroom, crestFactor, loudnessDetail, temporalDensity, transientSharpness, lowEndMono, spectralBalance, limiterStress, gainReduction, macroDynamics, monoFoldDown, smallSpeaker, clubSystem, carSystem, codecStress, intersamplePeak, clippingPropagation, noiseFloorModulation, aliasingRisk, artifactAccumulation] = await Promise.all([
     getAudioInfo(filePath),
     analyzeLoudness(filePath),
     detectPeaks(filePath),
@@ -400,13 +433,24 @@ async function analyzeAudioInternal(filePath, startTime) {
     lowEndMonoChecker.quickCheck(filePath),
     spectralBalanceAnalyzer.quickCheck(filePath),
     limiterStressIndex.quickCheck(filePath),
-    gainReductionMapper.quickCheck(filePath)
+    gainReductionMapper.quickCheck(filePath),
+    macroDynamicsClassifier.quickCheck(filePath),
+    monoFoldDownSimulator.quickCheck(filePath),
+    smallSpeakerTranslator.quickCheck(filePath),
+    clubSystemStressEstimator.quickCheck(filePath),
+    carSystemTranslator.quickCheck(filePath),
+    codecStressPredictor.quickCheck(filePath),
+    intersamplePeakRiskEstimator.quickCheck(filePath),
+    clippingPropagationDetector.quickCheck(filePath),
+    noiseFloorModulationDetector.quickCheck(filePath),
+    aliasingRiskEstimator.quickCheck(filePath),
+    artifactAccumulationTracker.quickCheck(filePath)
   ]);
   
   const analysisTime = Date.now() - startTime;
   
   // Identify problems based on analysis
-  const problems = identifyProblems({ info, loudness, peaks, spectral, stereo, phase, topology, dcOffset, headroom, crestFactor, loudnessDetail, temporalDensity, transientSharpness, lowEndMono, spectralBalance, limiterStress, gainReduction });
+  const problems = identifyProblems({ info, loudness, peaks, spectral, stereo, phase, topology, dcOffset, headroom, crestFactor, loudnessDetail, temporalDensity, transientSharpness, lowEndMono, spectralBalance, limiterStress, gainReduction, macroDynamics, monoFoldDown, smallSpeaker, clubSystem, carSystem, codecStress, intersamplePeak, clippingPropagation, noiseFloorModulation, aliasingRisk, artifactAccumulation });
   
   return {
     info,
@@ -426,6 +470,17 @@ async function analyzeAudioInternal(filePath, startTime) {
     spectralBalance,
     limiterStress,
     gainReduction,
+    macroDynamics,
+    monoFoldDown,
+    smallSpeaker,
+    clubSystem,
+    carSystem,
+    codecStress,
+    intersamplePeak,
+    clippingPropagation,
+    noiseFloorModulation,
+    aliasingRisk,
+    artifactAccumulation,
     problems,
     analysisTime,
     analyzedAt: new Date().toISOString()
@@ -439,7 +494,7 @@ async function analyzeAudioInternal(filePath, startTime) {
  */
 function identifyProblems(analysis) {
   const problems = [];
-  const { info, loudness, peaks, spectral, stereo, phase, topology, dcOffset, headroom, crestFactor, loudnessDetail, limiterStress, gainReduction } = analysis;
+  const { info, loudness, peaks, spectral, stereo, phase, topology, dcOffset, headroom, crestFactor, loudnessDetail, temporalDensity, transientSharpness, lowEndMono, spectralBalance, limiterStress, gainReduction, macroDynamics, monoFoldDown, smallSpeaker, clubSystem, carSystem, codecStress, intersamplePeak, clippingPropagation, noiseFloorModulation, aliasingRisk, artifactAccumulation } = analysis;
   
   // Loudness compliance issues
   if (loudness.integratedLoudness && loudness.integratedLoudness > -6) {
@@ -728,6 +783,239 @@ function identifyProblems(analysis) {
     });
   }
   
+  // Macro-dynamics shape issues
+  if (macroDynamics && macroDynamics.shape === 'FLUCTUATING') {
+    problems.push({
+      code: 'UNPREDICTABLE_DYNAMICS_SHAPE',
+      severity: 'medium',
+      category: 'DYNAMICS',
+      description: 'Energy arc is erratic with no clear pattern',
+      recommendation: 'Review overall dynamics structure for consistency across the asset'
+    });
+  }
+  
+  // Mono fold-down issues
+  if (monoFoldDown && monoFoldDown.status === 'CRITICAL') {
+    problems.push({
+      code: 'MONO_FOLDDOWN_CRITICAL',
+      severity: 'critical',
+      category: 'PLAYBACK_TRANSLATION',
+      description: 'Severe phase cancellation expected when summed to mono',
+      recommendation: 'Correct stereo phase alignment before release. Critical bass/content loss on mono systems.'
+    });
+  } else if (monoFoldDown && monoFoldDown.status === 'POOR') {
+    problems.push({
+      code: 'MONO_FOLDDOWN_POOR',
+      severity: 'high',
+      category: 'PLAYBACK_TRANSLATION',
+      description: 'Significant frequency loss expected on mono systems',
+      recommendation: 'Check for wide stereo effects that may cancel when summed'
+    });
+  }
+  
+  // Small speaker translation issues
+  if (smallSpeaker && smallSpeaker.status === 'CRITICAL') {
+    problems.push({
+      code: 'SMALL_SPEAKER_CRITICAL',
+      severity: 'high',
+      category: 'PLAYBACK_TRANSLATION',
+      description: 'Asset will sound thin/empty on phones and laptop speakers',
+      recommendation: 'Add harmonic content in 200-500Hz range to carry bass perception'
+    });
+  } else if (smallSpeaker && smallSpeaker.status === 'POOR') {
+    problems.push({
+      code: 'SMALL_SPEAKER_POOR',
+      severity: 'medium',
+      category: 'PLAYBACK_TRANSLATION',
+      description: 'Significant bass loss expected on small speakers',
+      recommendation: 'Consider adding upper harmonics to sub-bass content'
+    });
+  }
+  
+  // Club system stress issues
+  if (clubSystem && clubSystem.status === 'CRITICAL') {
+    problems.push({
+      code: 'CLUB_SYSTEM_CRITICAL',
+      severity: 'critical',
+      category: 'PLAYBACK_TRANSLATION',
+      description: 'Sub-bass content may cause PA limiter distortion or subwoofer stress',
+      recommendation: 'Reduce sub-bass energy below 50Hz or apply high-pass filtering'
+    });
+  } else if (clubSystem && clubSystem.status === 'HIGH') {
+    problems.push({
+      code: 'CLUB_SYSTEM_STRESS',
+      severity: 'high',
+      category: 'PLAYBACK_TRANSLATION',
+      description: 'High sub-bass energy may trigger PA limiter pumping',
+      recommendation: 'Consider sub-bass reduction for PA-friendly output'
+    });
+  }
+  
+  // Car system translation issues
+  if (carSystem && carSystem.status === 'CRITICAL') {
+    problems.push({
+      code: 'CAR_SYSTEM_CRITICAL',
+      severity: 'high',
+      category: 'PLAYBACK_TRANSLATION',
+      description: 'Low-mid buildup will cause muddiness and limiter pumping in car systems',
+      recommendation: 'Apply 200-400Hz cut to reduce cabin resonance buildup'
+    });
+  } else if (carSystem && carSystem.status === 'POOR') {
+    problems.push({
+      code: 'CAR_SYSTEM_TRANSLATION',
+      severity: 'medium',
+      category: 'PLAYBACK_TRANSLATION',
+      description: 'Significant tonal changes expected in car playback',
+      recommendation: 'Check for low-mid accumulation that may boom in enclosed spaces'
+    });
+  }
+  
+  // Codec stress issues
+  if (codecStress && codecStress.status === 'CRITICAL') {
+    problems.push({
+      code: 'CODEC_STRESS_CRITICAL',
+      severity: 'critical',
+      category: 'PLAYBACK_TRANSLATION',
+      description: 'High risk of audible MP3/AAC artifacts at typical streaming bitrates',
+      recommendation: 'Reduce sibilance/HF content or request 320kbps minimum for distribution'
+    });
+  } else if (codecStress && codecStress.status === 'HIGH') {
+    problems.push({
+      code: 'CODEC_STRESS_HIGH',
+      severity: 'high',
+      category: 'PLAYBACK_TRANSLATION',
+      description: 'Pre-echo or HF swirl artifacts likely at lower bitrates',
+      recommendation: 'Consider adding fade-ins before transients and de-essing sibilant content'
+    });
+  }
+  
+  // Intersample peak risk issues
+  if (intersamplePeak && intersamplePeak.status === 'CRITICAL') {
+    problems.push({
+      code: 'INTERSAMPLE_PEAK_CRITICAL',
+      severity: 'critical',
+      category: 'SIGNAL_INTEGRITY',
+      description: `Intersample overshoot of ${intersamplePeak.overshootDb?.toFixed(1)} dB will cause post-codec clipping`,
+      recommendation: 'Apply true peak limiting to -1.5 dBTP or lower before codec encoding'
+    });
+  } else if (intersamplePeak && intersamplePeak.status === 'HIGH') {
+    problems.push({
+      code: 'INTERSAMPLE_PEAK_HIGH',
+      severity: 'high',
+      category: 'SIGNAL_INTEGRITY',
+      description: `Intersample overshoot of ${intersamplePeak.overshootDb?.toFixed(1)} dB risks clipping on some DACs`,
+      recommendation: 'Consider true peak limiting to -1.0 dBTP'
+    });
+  } else if (intersamplePeak && intersamplePeak.status === 'MODERATE') {
+    problems.push({
+      code: 'INTERSAMPLE_PEAK_MODERATE',
+      severity: 'medium',
+      category: 'SIGNAL_INTEGRITY',
+      description: 'Moderate intersample peak overshoot detected',
+      recommendation: 'Monitor true peak levels for codec-sensitive distribution'
+    });
+  }
+  
+  // Clipping propagation issues
+  if (clippingPropagation && clippingPropagation.status === 'UPSTREAM_CLIPPING') {
+    problems.push({
+      code: 'SOURCE_CLIPPING_DETECTED',
+      severity: 'critical',
+      category: 'SIGNAL_INTEGRITY',
+      description: 'Clipping artifacts originate from source material (upstream)',
+      recommendation: 'Request original unclipped source. De-clipping may help but cannot fully restore.'
+    });
+  } else if (clippingPropagation && clippingPropagation.status === 'DOWNSTREAM_CLIPPING') {
+    problems.push({
+      code: 'PROCESSING_CLIPPING_DETECTED',
+      severity: 'high',
+      category: 'SIGNAL_INTEGRITY',
+      description: 'Clipping introduced during processing (downstream)',
+      recommendation: 'Reduce gain staging or limiter threshold in processing chain'
+    });
+  } else if (clippingPropagation && clippingPropagation.status === 'MIXED_CLIPPING') {
+    problems.push({
+      code: 'MIXED_CLIPPING_DETECTED',
+      severity: 'critical',
+      category: 'SIGNAL_INTEGRITY',
+      description: 'Clipping from both source and processing detected',
+      recommendation: 'Request clean source and review processing chain gain structure'
+    });
+  }
+  
+  // Noise floor modulation issues
+  if (noiseFloorModulation && noiseFloorModulation.status === 'SEVERE') {
+    problems.push({
+      code: 'NOISE_FLOOR_PUMPING_SEVERE',
+      severity: 'high',
+      category: 'SIGNAL_INTEGRITY',
+      description: 'Severe breathing/pumping artifacts from aggressive compression or noise gating',
+      recommendation: 'Use less aggressive noise gate or reduce compression ratio'
+    });
+  } else if (noiseFloorModulation && noiseFloorModulation.status === 'MODERATE') {
+    problems.push({
+      code: 'NOISE_FLOOR_PUMPING_MODERATE',
+      severity: 'medium',
+      category: 'SIGNAL_INTEGRITY',
+      description: 'Moderate noise floor modulation detected (breathing effect)',
+      recommendation: 'Adjust gate/expander release times for smoother transitions'
+    });
+  }
+  
+  // Aliasing risk issues
+  if (aliasingRisk && aliasingRisk.status === 'CRITICAL') {
+    problems.push({
+      code: 'ALIASING_RISK_CRITICAL',
+      severity: 'critical',
+      category: 'SIGNAL_INTEGRITY',
+      description: 'High-frequency content near Nyquist - critical aliasing risk during processing',
+      recommendation: 'Apply anti-aliasing filter before any sample rate conversion or distortion'
+    });
+  } else if (aliasingRisk && aliasingRisk.status === 'HIGH_RISK') {
+    problems.push({
+      code: 'ALIASING_RISK_HIGH',
+      severity: 'high',
+      category: 'SIGNAL_INTEGRITY',
+      description: 'Significant ultrasonic content may cause aliasing in non-oversampled processing',
+      recommendation: 'Use oversampling in distortion/saturation plugins or apply gentle lowpass'
+    });
+  } else if (aliasingRisk && aliasingRisk.status === 'MODERATE_RISK') {
+    problems.push({
+      code: 'ALIASING_RISK_MODERATE',
+      severity: 'medium',
+      category: 'SIGNAL_INTEGRITY',
+      description: 'Moderate HF energy near Nyquist frequency',
+      recommendation: 'Monitor for aliasing artifacts if applying pitch shifting or heavy distortion'
+    });
+  }
+  
+  // Artifact accumulation issues
+  if (artifactAccumulation && artifactAccumulation.status === 'SATURATED') {
+    problems.push({
+      code: 'PROCESSING_CAPACITY_EXHAUSTED',
+      severity: 'critical',
+      category: 'SIGNAL_INTEGRITY',
+      description: 'Asset has reached maximum processing capacity - quality will degrade with additional processing',
+      recommendation: 'Do not apply additional compression or limiting. Request less processed source if available.'
+    });
+  } else if (artifactAccumulation && artifactAccumulation.status === 'HEAVY') {
+    problems.push({
+      code: 'HEAVY_PROCESSING_DETECTED',
+      severity: 'high',
+      category: 'SIGNAL_INTEGRITY',
+      description: `Estimated ${artifactAccumulation.estimatedPasses?.estimate || '5+'} processing passes detected`,
+      recommendation: 'Limit additional transformations to essential operations only'
+    });
+  } else if (artifactAccumulation && artifactAccumulation.status === 'MODERATE') {
+    problems.push({
+      code: 'MODERATE_PROCESSING_DETECTED',
+      severity: 'low',
+      category: 'SIGNAL_INTEGRITY',
+      description: 'Moderate processing accumulation - reasonable headroom for additional transformations',
+      recommendation: 'Use conservative dynamics settings for remaining processing'
+    });
+  }
+  
   return problems;
 }
 
@@ -1007,6 +1295,24 @@ module.exports = {
   
   // Gain reduction distribution mapper
   gainReductionMapper,
+  
+  // Macro-dynamics shape classifier
+  macroDynamicsClassifier,
+  
+  // Mono fold-down simulator
+  monoFoldDownSimulator,
+  
+  // Small speaker translator
+  smallSpeakerTranslator,
+  
+  // Club system stress estimator
+  clubSystemStressEstimator,
+  
+  // Car system translator
+  carSystemTranslator,
+  
+  // Codec stress predictor
+  codecStressPredictor,
   
   // Constants
   STORAGE_BASE
