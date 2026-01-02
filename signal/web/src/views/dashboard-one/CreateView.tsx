@@ -96,96 +96,104 @@ export function CreateView({ role: _role, onNavigate }: CreateViewProps) {
   // ==========================================================================
 
   return (
-    <div className="create-view">
-      <header className="view-header">
-        <h2 className="view-title">Create Assets</h2>
-        <p className="view-subtitle">Upload files or record vocals for your project</p>
+    <div className="view">
+      {/* Header */}
+      <header className="view__header">
+        <h2 className="view__title">Create Assets</h2>
+        <p className="view__subtitle">Upload files or record vocals for your project</p>
       </header>
 
       {/* Create Project Form */}
-      <section className="create-section project-creation">
-        <h3 className="section-title">New Project</h3>
-        <form onSubmit={handleCreateProject} className="project-form">
-          <div className="form-row">
-            <input
-              type="text"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              placeholder="Enter project name"
-              disabled={creatingProject}
-              className="project-name-input"
-            />
-            <button 
-              type="submit" 
-              disabled={creatingProject || !projectName.trim()}
-              className="btn-create"
-            >
-              {creatingProject ? 'Creating...' : 'Create Project'}
-            </button>
-          </div>
-
-          {projectError && <div className="form-error">{projectError}</div>}
-          
-          {createdProject && (
-            <div className="form-success">
-              ✓ Project "{createdProject.name}" created successfully!
+      <section className="section">
+        <h3 className="section__title">New Project</h3>
+        <div className="card">
+          <form onSubmit={handleCreateProject} className="card__body">
+            <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <input
+                  type="text"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  placeholder="Enter project name"
+                  disabled={creatingProject}
+                  className="form-input"
+                  style={{ width: '100%' }}
+                />
+              </div>
+              <button 
+                type="submit" 
+                disabled={creatingProject || !projectName.trim()}
+                className="btn btn--primary"
+              >
+                {creatingProject ? 'Creating...' : 'Create Project'}
+              </button>
             </div>
-          )}
-        </form>
+
+            {projectError && <div className="error-message" style={{ marginTop: 'var(--space-3)' }}>{projectError}</div>}
+            
+            {createdProject && (
+              <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-3)', background: 'rgba(34, 197, 94, 0.1)', borderRadius: 'var(--border-radius)', color: 'var(--color-success)' }}>
+                ✓ Project "{createdProject.name}" created successfully!
+              </div>
+            )}
+          </form>
+        </div>
       </section>
 
       {/* Existing Projects */}
       {projects.length > 0 && (
-        <section className="create-section projects-list">
-          <h3 className="section-title">Existing Projects ({projects.length})</h3>
-          <div className="project-chips">
+        <section className="section">
+          <h3 className="section__title">Existing Projects ({projects.length})</h3>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
             {projects.slice(0, 5).map(p => (
-              <span key={p.id} className={`project-chip state-${p.state.toLowerCase()}`}>
+              <span key={p.id} className={`badge badge--state-${p.state.toLowerCase()}`}>
                 {p.name}
               </span>
             ))}
             {projects.length > 5 && (
-              <span className="project-chip more">+{projects.length - 5} more</span>
+              <span className="badge badge--neutral">+{projects.length - 5} more</span>
             )}
           </div>
         </section>
       )}
 
-      {/* Upload Section — Component: BatchUploader */}
-      <section className="create-section upload-section">
-        <h3 className="section-title">Upload Files</h3>
-        <div className="component-container">
-          <BatchUploader
-            onUploadComplete={handleUploadComplete}
-            maxFileSize={500 * 1024 * 1024}
-            acceptedFormats={['.wav', '.mp3', '.aiff', '.flac', '.ogg']}
-            maxFiles={50}
-          />
-        </div>
+      {/* Upload Section */}
+      <section className="section">
+        <h3 className="section__title">Upload Files</h3>
+        <BatchUploader
+          onUploadComplete={handleUploadComplete}
+          maxFileSize={500 * 1024 * 1024}
+          acceptedFormats={['.wav', '.mp3', '.aiff', '.flac', '.ogg']}
+          maxFiles={50}
+        />
       </section>
 
-      {/* Record Vocals Section — Component: VocalRecorder */}
-      <section className="create-section record-section">
-        <h3 className="section-title">Record Vocals</h3>
-        <div className="component-container">
-          <VocalRecorder
-            onRecordingComplete={handleRecordingComplete}
-            maxDuration={600}
-            sampleRate={48000}
-          />
-        </div>
+      {/* Record Vocals Section */}
+      <section className="section">
+        <h3 className="section__title">Record Vocals</h3>
+        <VocalRecorder
+          onRecordingComplete={handleRecordingComplete}
+          maxDuration={600}
+          sampleRate={48000}
+        />
       </section>
 
       {/* Quick Navigation */}
       {uploadComplete && (
-        <section className="create-section next-steps">
-          <h3 className="section-title">Next Steps</h3>
-          <div className="nav-buttons">
-            <button onClick={() => onNavigate('transform')} className="btn-primary">
-              → Start Processing
+        <section className="section">
+          <h3 className="section__title">Next Steps</h3>
+          <div className="actions-grid">
+            <button onClick={() => onNavigate('transform')} className="action-card">
+              <span className="action-card__icon">⚙️</span>
+              <span className="action-card__content">
+                <span className="action-card__label">Start Processing</span>
+              </span>
             </button>
-            <button onClick={() => onNavigate('assets')} className="btn-secondary">
-              View All Assets
+            <button onClick={() => onNavigate('assets')} className="action-card">
+              <span className="action-card__icon">📁</span>
+              <span className="action-card__content">
+                <span className="action-card__label">View All Assets</span>
+              </span>
             </button>
           </div>
         </section>

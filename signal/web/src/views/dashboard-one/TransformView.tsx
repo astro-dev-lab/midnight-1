@@ -101,40 +101,55 @@ export function TransformView({ projectId, role, onNavigate }: TransformViewProp
   const loading = loadingProjects;
 
   if (loading) {
-    return <div className="view-loading">Loading...</div>;
+    return <div className="loading">Loading...</div>;
   }
 
+  const getCategoryBadgeClass = (category: string) => {
+    switch (category) {
+      case 'RAW': return 'badge badge--neutral';
+      case 'DERIVED': return 'badge badge--warning';
+      case 'FINAL': return 'badge badge--success';
+      default: return 'badge badge--neutral';
+    }
+  };
+
   return (
-    <div className="transform-view">
-      <header className="view-header">
-        <h2 className="view-title">Transform</h2>
-        <p className="view-subtitle">Configure processing parameters for your assets</p>
+    <div className="view">
+      {/* Header */}
+      <header className="view__header">
+        <h2 className="view__title">Transform</h2>
+        <p className="view__subtitle">Configure processing parameters for your assets</p>
       </header>
 
-      {/* Audio Analysis — Component: AudioVisualization */}
-      <section className="analysis-section">
-        <h3 className="section-title">Audio Analysis</h3>
-        <div className="visualization-grid">
-          <div className="viz-panel">
-            <AudioVisualization type="spectrum" height={140} showLabels />
+      {/* Audio Analysis */}
+      <section className="section">
+        <h3 className="section__title">Audio Analysis</h3>
+        <div className="layout-two-col">
+          <div className="card">
+            <div className="card__body">
+              <AudioVisualization type="spectrum" height={140} showLabels />
+            </div>
           </div>
-          <div className="viz-panel">
-            <AudioVisualization type="levels" height={140} showLabels />
+          <div className="card">
+            <div className="card__body">
+              <AudioVisualization type="levels" height={140} showLabels />
+            </div>
           </div>
         </div>
       </section>
 
       <form onSubmit={handleSubmit}>
         {/* Project Selection */}
-        <section className="form-section">
-          <h3 className="section-title">1. Select Project</h3>
+        <section className="section">
+          <h3 className="section__title">1. Select Project</h3>
           <select 
             value={selectedProjectId || ''} 
             onChange={(e) => {
               setSelectedProjectId(parseInt(e.target.value));
               setSelectedAssetIds([]);
             }}
-            className="project-select"
+            className="form-select"
+            style={{ minWidth: '240px' }}
           >
             <option value="">Select Project</option>
             {projects.map(p => (
@@ -144,60 +159,66 @@ export function TransformView({ projectId, role, onNavigate }: TransformViewProp
         </section>
 
         {/* Asset Selection */}
-        <section className="form-section">
-          <h3 className="section-title">2. Select Assets ({selectedAssetIds.length} selected)</h3>
+        <section className="section">
+          <h3 className="section__title">2. Select Assets ({selectedAssetIds.length} selected)</h3>
           {loadingAssets ? (
-            <p className="loading-text">Loading assets...</p>
+            <div className="loading loading--inline">Loading assets...</div>
           ) : assets.length === 0 ? (
-            <p className="empty-message">No processable assets available.</p>
+            <div className="empty-state">
+              <span className="empty-state__icon">🎵</span>
+              <p className="empty-state__title">No processable assets</p>
+              <p className="empty-state__description">Upload assets first to start processing.</p>
+            </div>
           ) : (
-            <div className="asset-checkboxes">
-              {assets.map(asset => (
-                <label key={asset.id} className="asset-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={selectedAssetIds.includes(asset.id)}
-                    onChange={() => handleAssetToggle(asset.id)}
-                  />
-                  <span className="asset-name">{asset.name}</span>
-                  <span className={`category-badge category-${asset.category.toLowerCase()}`}>
-                    {asset.category}
-                  </span>
-                </label>
-              ))}
+            <div className="card">
+              <div className="card__body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                {assets.map(asset => (
+                  <label key={asset.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-2)', borderRadius: 'var(--border-radius)', cursor: 'pointer', transition: 'background-color 0.15s' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedAssetIds.includes(asset.id)}
+                      onChange={() => handleAssetToggle(asset.id)}
+                      style={{ width: '16px', height: '16px' }}
+                    />
+                    <span style={{ flex: 1, color: 'var(--color-white)' }}>{asset.name}</span>
+                    <span className={getCategoryBadgeClass(asset.category)}>
+                      {asset.category}
+                    </span>
+                  </label>
+                ))}
+              </div>
             </div>
           )}
         </section>
 
-        {/* Preset Selection — Component: QualityPresets */}
-        <section className="form-section preset-section">
-          <h3 className="section-title">3. Select Processing Preset</h3>
-          <div className="component-container">
-            <QualityPresets
-              selectedPreset={selectedPreset}
-              onPresetChange={(preset) => setSelectedPreset(preset)}
-              disabled={false}
-            />
-          </div>
+        {/* Preset Selection */}
+        <section className="section">
+          <h3 className="section__title">3. Select Processing Preset</h3>
+          <QualityPresets
+            selectedPreset={selectedPreset}
+            onPresetChange={(preset) => setSelectedPreset(preset)}
+            disabled={false}
+          />
           
           {!canAdjustParameters && (
-            <p className="role-notice">
+            <p style={{ marginTop: 'var(--space-3)', fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-400)' }}>
               Basic role: Using preset defaults. Upgrade to Standard for parameter control.
             </p>
           )}
         </section>
 
         {/* Submit */}
-        <section className="form-section submit-section">
-          {error && <div className="form-error">{error}</div>}
+        <section className="section">
+          {error && <div className="error-message">{error}</div>}
           
           {success && (
-            <div className="form-success">
-              Job submitted successfully!
+            <div style={{ padding: 'var(--space-4)', background: 'rgba(34, 197, 94, 0.1)', borderRadius: 'var(--border-radius)', color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+              <span>✓ Job submitted successfully!</span>
               <button 
                 type="button" 
                 onClick={() => onNavigate('history')}
-                className="btn-link"
+                className="btn btn--ghost"
+                style={{ marginLeft: 'auto' }}
               >
                 View in History →
               </button>
@@ -207,7 +228,7 @@ export function TransformView({ projectId, role, onNavigate }: TransformViewProp
           <button 
             type="submit" 
             disabled={submitting || !selectedPreset || selectedAssetIds.length === 0}
-            className="btn-submit"
+            className="btn btn--primary btn--lg"
           >
             {submitting ? 'Submitting...' : 'Submit Processing Job'}
           </button>
