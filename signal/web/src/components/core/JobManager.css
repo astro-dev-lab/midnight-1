@@ -1,25 +1,24 @@
 .job-manager {
-  background: var(--color-surface);
-  border: var(--border-width-1) solid var(--color-border);
+  background: var(--color-gray-900);
+  border: 1px solid var(--color-gray-800);
   border-radius: var(--border-radius-lg);
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
 }
 
 .manager-header {
-  padding: var(--space-6);
-  border-bottom: var(--border-width-1) solid var(--color-border);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-gray-800);
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--space-6);
-  background: var(--color-surface-subtle);
+  align-items: center;
+  gap: var(--space-4);
+  background: var(--color-gray-800);
 }
 
 .header-info .text-heading {
-  color: var(--color-primary);
-  margin-bottom: var(--space-2);
-  font-size: var(--font-size-xl);
+  color: var(--color-white);
+  margin: 0;
+  font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -27,21 +26,21 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-400);
   font-weight: var(--font-weight-medium);
 }
 
 .status-indicator {
-  width: var(--space-2);
-  height: var(--space-2);
+  width: 8px;
+  height: 8px;
   border-radius: var(--border-radius-full);
-  background: var(--status-pending);
+  background: var(--color-gray-500);
   transition: background-color var(--duration-200) var(--ease-out);
 }
 
 .status-indicator.connected {
-  background: var(--status-delivered);
+  background: var(--color-success);
   animation: pulse var(--duration-1000) infinite var(--ease-in-out);
 }
 
@@ -58,40 +57,40 @@
 
 .queue-stats {
   display: flex;
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 
 .stat-item {
   text-align: center;
-  min-width: 60px;
+  min-width: 50px;
 }
 
 .stat-value {
   display: block;
   font-family: var(--font-mono);
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--color-primary);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-white);
   line-height: 1;
 }
 
 .stat-label {
   display: block;
-  font-size: 0.8rem;
-  color: var(--color-border);
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-400);
   margin-top: var(--space-1);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: var(--letter-spacing-wider);
 }
 
 .manager-controls {
-  padding: var(--space-4) var(--space-6);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-secondary);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-gray-800);
+  background: var(--color-gray-900);
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--space-6);
+  align-items: center;
+  gap: var(--space-4);
 }
 
 .filter-controls {
@@ -100,14 +99,20 @@
 
 .filter-controls select {
   min-width: 150px;
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--color-gray-800);
+  border: 1px solid var(--color-gray-700);
+  border-radius: var(--border-radius);
+  color: var(--color-white);
+  font-size: var(--font-size-sm);
 }
 
 .queue-priorities h4 {
-  color: var(--color-primary);
-  font-size: 0.9rem;
-  margin-bottom: var(--space-3);
+  color: var(--color-gray-200);
+  font-size: var(--font-size-xs);
+  margin-bottom: var(--space-2);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: var(--letter-spacing-wider);
 }
 
 .priority-grid {
@@ -123,30 +128,30 @@
 }
 
 .priority-name {
-  font-size: 0.8rem;
-  color: var(--color-border);
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-400);
 }
 
 .priority-count {
   font-family: var(--font-mono);
-  font-weight: 600;
-  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-white);
 }
 
 .job-list {
-  max-height: 600px;
+  max-height: 500px;
   overflow-y: auto;
 }
 
 .job-item {
-  border-left: 4px solid var(--state-color);
-  background: var(--color-surface);
-  transition: all 0.2s ease;
+  border-left: 3px solid var(--state-color);
+  background: var(--color-gray-900);
+  transition: background-color var(--duration-150) var(--ease-out);
   cursor: pointer;
 }
 
 .job-item:hover {
-  background: rgba(0, 0, 0, 0.02);
+  background: var(--color-gray-800);
 }
 
 .job-item.selected {

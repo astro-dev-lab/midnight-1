@@ -6,29 +6,29 @@
  */
 
 .vocal-recorder {
-  background: var(--color-surface, #18181b);
-  border: var(--border-width-1, 1px) solid var(--color-border, #27272a);
-  border-radius: var(--border-radius-lg, 8px);
+  background: var(--color-gray-900);
+  border: 1px solid var(--color-gray-800);
+  border-radius: var(--border-radius-lg);
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
 }
 
 .recorder-header {
-  padding: var(--space-6, 1.5rem);
-  border-bottom: var(--border-width-1, 1px) solid var(--color-border, #27272a);
-  background: var(--color-surface-subtle, #1f1f23);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-gray-800);
+  background: var(--color-gray-800);
 }
 
 .recorder-header .text-heading {
-  color: var(--color-primary, #a855f7);
-  margin-bottom: var(--space-2, 0.5rem);
-  font-size: var(--font-size-xl, 1.25rem);
-  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-white);
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
 }
 
 .recorder-header .text-caption {
-  color: var(--color-text-secondary, #a1a1aa);
-  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-gray-400);
+  font-size: var(--font-size-xs);
+  margin: 0;
 }
 
 /* ============================================================================
@@ -38,14 +38,14 @@
 .recorder-error {
   display: flex;
   align-items: center;
-  gap: var(--space-3, 0.75rem);
-  padding: var(--space-4, 1rem);
-  margin: var(--space-4, 1rem);
+  gap: var(--space-3);
+  padding: var(--space-4);
+  margin: var(--space-4);
   background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: var(--border-radius-md, 4px);
-  color: #fca5a5;
-  font-size: 0.9rem;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--border-radius);
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
 }
 
 .error-icon {
@@ -56,14 +56,14 @@
   margin-left: auto;
   background: none;
   border: none;
-  color: #fca5a5;
+  color: var(--color-danger-light);
   cursor: pointer;
-  font-size: 1.2rem;
-  padding: 0 var(--space-2, 0.5rem);
+  font-size: var(--font-size-lg);
+  padding: 0 var(--space-2);
 }
 
 .error-dismiss:hover {
-  color: #ef4444;
+  color: var(--color-danger);
 }
 
 /* ============================================================================
@@ -75,15 +75,15 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: var(--space-8, 2rem);
+  padding: var(--space-12);
   text-align: center;
   min-height: 200px;
 }
 
 .permission-icon {
-  font-size: 3rem;
-  margin-bottom: var(--space-4, 1rem);
-  opacity: 0.8;
+  font-size: 2.5rem;
+  margin-bottom: var(--space-4);
+  opacity: 0.6;
 }
 
 .permission-icon.spinning {
@@ -96,8 +96,8 @@
 }
 
 .permission-text {
-  color: var(--color-text-secondary, #a1a1aa);
-  margin-bottom: var(--space-6, 1.5rem);
+  color: var(--color-gray-400);
+  margin-bottom: var(--space-4);
   font-size: 1rem;
 }
 
