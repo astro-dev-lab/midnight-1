@@ -1,0 +1,166 @@
+/**
+ * ActionButton Styles
+ * Decision-oriented action buttons
+ */
+
+.action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: 
+    background-color var(--duration-150) var(--ease-out),
+    border-color var(--duration-150) var(--ease-out),
+    color var(--duration-150) var(--ease-out),
+    box-shadow var(--duration-150) var(--ease-out);
+}
+
+.action-button:disabled {
+  opacity: var(--state-disabled-opacity);
+  cursor: not-allowed;
+}
+
+.action-button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.action-button.full-width {
+  width: 100%;
+}
+
+.action-button.loading {
+  position: relative;
+}
+
+/* Size variants */
+.action-button.size-sm {
+  height: var(--component-height-sm);
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-xs);
+}
+
+.action-button.size-md {
+  height: var(--component-height-md);
+  padding: 0 var(--space-4);
+  font-size: var(--font-size-sm);
+}
+
+.action-button.size-lg {
+  height: var(--component-height-lg);
+  padding: 0 var(--space-6);
+  font-size: var(--font-size-base);
+}
+
+/* Variant: Primary */
+.action-button.variant-primary {
+  background-color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  color: var(--color-white);
+}
+
+.action-button.variant-primary:hover:not(:disabled) {
+  background-color: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+}
+
+/* Variant: Secondary */
+.action-button.variant-secondary {
+  background-color: var(--color-gray-800);
+  border: 1px solid var(--color-gray-700);
+  color: var(--color-white);
+}
+
+.action-button.variant-secondary:hover:not(:disabled) {
+  background-color: var(--color-gray-700);
+  border-color: var(--color-gray-600);
+}
+
+/* Variant: Success (Approve) */
+.action-button.variant-success {
+  background-color: var(--color-success);
+  border: 1px solid var(--color-success);
+  color: var(--color-white);
+}
+
+.action-button.variant-success:hover:not(:disabled) {
+  background-color: #16a34a;
+  border-color: #16a34a;
+}
+
+/* Variant: Danger (Reject) */
+.action-button.variant-danger {
+  background-color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+  color: var(--color-white);
+}
+
+.action-button.variant-danger:hover:not(:disabled) {
+  background-color: #dc2626;
+  border-color: #dc2626;
+}
+
+/* Variant: Ghost */
+.action-button.variant-ghost {
+  background-color: transparent;
+  border: 1px solid transparent;
+  color: var(--color-gray-300);
+}
+
+.action-button.variant-ghost:hover:not(:disabled) {
+  background-color: var(--color-gray-800);
+  color: var(--color-white);
+}
+
+/* Icon */
+.action-button-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.action-button.size-sm .action-button-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.action-button.size-md .action-button-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.action-button.size-lg .action-button-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.action-button-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Spinner */
+.action-button-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Label */
+.action-button-label {
+  white-space: nowrap;
+}

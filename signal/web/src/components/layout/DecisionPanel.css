@@ -1,0 +1,160 @@
+/**
+ * DecisionPanel Styles - Central decision surface
+ * Dark, restrained, card-based layout
+ */
+
+.decision-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100vh;
+  background-color: var(--color-gray-950, #0a0a0a);
+  overflow: hidden;
+}
+
+.decision-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-8);
+  border-bottom: 1px solid var(--color-gray-800);
+  background-color: var(--color-gray-900);
+}
+
+.decision-panel-titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.decision-panel-title {
+  margin: 0;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-white);
+  line-height: var(--line-height-tight);
+}
+
+.decision-panel-subtitle {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-400);
+}
+
+.decision-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.decision-panel-content {
+  flex: 1;
+  padding: var(--space-6) var(--space-8);
+  overflow-y: auto;
+}
+
+/* Decision Card */
+.decision-card {
+  background-color: var(--color-gray-900);
+  border: 1px solid var(--color-gray-800);
+  border-radius: var(--border-radius-lg);
+  margin-bottom: var(--space-4);
+  overflow: hidden;
+}
+
+.decision-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-gray-800);
+}
+
+.decision-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.decision-card-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--border-radius-full);
+  flex-shrink: 0;
+}
+
+.decision-card-indicator.status-pass {
+  background-color: var(--color-success);
+}
+
+.decision-card-indicator.status-pending {
+  background-color: var(--color-warning);
+}
+
+.decision-card-indicator.status-fail {
+  background-color: var(--color-danger);
+}
+
+.decision-card-indicator.status-neutral {
+  background-color: var(--color-gray-500);
+}
+
+.decision-card-title {
+  margin: 0;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-white);
+}
+
+.decision-card-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--border-radius);
+  color: var(--color-gray-400);
+  cursor: pointer;
+  transition: 
+    background-color var(--duration-150) var(--ease-out),
+    color var(--duration-150) var(--ease-out);
+}
+
+.decision-card-toggle:hover {
+  background-color: var(--color-gray-800);
+  color: var(--color-white);
+}
+
+.toggle-icon {
+  transition: transform var(--duration-200) var(--ease-out);
+}
+
+.toggle-icon.expanded {
+  transform: rotate(180deg);
+}
+
+.decision-card-content {
+  padding: var(--space-5);
+}
+
+/* Card status border accent */
+.decision-card.status-pass {
+  border-left: 3px solid var(--color-success);
+}
+
+.decision-card.status-pending {
+  border-left: 3px solid var(--color-warning);
+}
+
+.decision-card.status-fail {
+  border-left: 3px solid var(--color-danger);
+}
+
+.decision-card.status-neutral {
+  border-left: 3px solid var(--color-gray-600);
+}

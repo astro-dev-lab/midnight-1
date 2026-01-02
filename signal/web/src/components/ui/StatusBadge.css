@@ -1,0 +1,192 @@
+/**
+ * StatusBadge Styles
+ * Semantic colors for state indication
+ */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--border-radius-full);
+  white-space: nowrap;
+}
+
+.status-badge-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Size variants */
+.status-badge.size-sm {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--font-size-xs);
+}
+
+.status-badge.size-sm .status-badge-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.status-badge.size-md {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--font-size-sm);
+}
+
+.status-badge.size-md .status-badge-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.status-badge.size-lg {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-size-base);
+}
+
+.status-badge.size-lg .status-badge-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Subtle variant (default) */
+.status-badge.variant-subtle.status-pass {
+  background-color: rgba(34, 197, 94, 0.15);
+  color: var(--color-success);
+}
+
+.status-badge.variant-subtle.status-pending {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--color-warning);
+}
+
+.status-badge.variant-subtle.status-fail {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: var(--color-danger);
+}
+
+.status-badge.variant-subtle.status-neutral {
+  background-color: rgba(107, 114, 128, 0.15);
+  color: var(--color-gray-400);
+}
+
+.status-badge.variant-subtle.status-info {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: var(--color-primary);
+}
+
+/* Solid variant */
+.status-badge.variant-solid.status-pass {
+  background-color: var(--color-success);
+  color: var(--color-white);
+}
+
+.status-badge.variant-solid.status-pending {
+  background-color: var(--color-warning);
+  color: var(--color-gray-900);
+}
+
+.status-badge.variant-solid.status-fail {
+  background-color: var(--color-danger);
+  color: var(--color-white);
+}
+
+.status-badge.variant-solid.status-neutral {
+  background-color: var(--color-gray-600);
+  color: var(--color-white);
+}
+
+.status-badge.variant-solid.status-info {
+  background-color: var(--color-primary);
+  color: var(--color-white);
+}
+
+/* Outline variant */
+.status-badge.variant-outline {
+  background-color: transparent;
+  border-width: 1px;
+  border-style: solid;
+}
+
+.status-badge.variant-outline.status-pass {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.status-badge.variant-outline.status-pending {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.status-badge.variant-outline.status-fail {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.status-badge.variant-outline.status-neutral {
+  border-color: var(--color-gray-500);
+  color: var(--color-gray-400);
+}
+
+.status-badge.variant-outline.status-info {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* Status Dot */
+.status-dot {
+  display: inline-block;
+  border-radius: var(--border-radius-full);
+  flex-shrink: 0;
+}
+
+.status-dot.size-sm {
+  width: 6px;
+  height: 6px;
+}
+
+.status-dot.size-md {
+  width: 8px;
+  height: 8px;
+}
+
+.status-dot.size-lg {
+  width: 10px;
+  height: 10px;
+}
+
+.status-dot.status-pass {
+  background-color: var(--color-success);
+}
+
+.status-dot.status-pending {
+  background-color: var(--color-warning);
+}
+
+.status-dot.status-fail {
+  background-color: var(--color-danger);
+}
+
+.status-dot.status-neutral {
+  background-color: var(--color-gray-500);
+}
+
+.status-dot.status-info {
+  background-color: var(--color-primary);
+}
+
+/* Pulse animation for active states */
+.status-dot.pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.1);
+  }
+}

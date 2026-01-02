@@ -1,1025 +1,817 @@
-'use strict';
-
 /**
  * Version Lineage Tracker
  * 
- * Tracks DSP transformation deltas across asset versions using parentId lineage.
- * Monitors how audio characteristics evolve through processing chains and ensures
- * version relationships maintain expected quality trajectories.
+ * Tracks DSP deltas across asset versions, analyzes cumulative
+ * impact of processing chains, and detects patterns in version
+ * history that may indicate quality degradation.
  * 
- * StudioOS Terminology:
- * - asset: Audio file being tracked
- * - version: Iteration of an asset with parentId link
- * - lineage: Chain of versions from original to final
- * - delta: Measured difference between versions
- * - transformation: DSP operation applied between versions
+ * Per STUDIOOS_FUNCTIONAL_SPECS.md - Version tracking enables
+ * transparency in processing history and quality assurance.
  */
-
-// ============================================================================
-// Enums (Frozen Objects)
-// ============================================================================
-
-/**
- * Version state in the lineage
- */
-const VersionState = Object.freeze({
-  RAW: 'RAW',
-  DERIVED: 'DERIVED',
-  FINAL: 'FINAL'
-});
-
-/**
- * Relationship between versions
- */
-const Relationship = Object.freeze({
-  PARENT: 'PARENT',
-  CHILD: 'CHILD',
-  SIBLING: 'SIBLING',
-  ANCESTOR: 'ANCESTOR',
-  DESCENDANT: 'DESCENDANT',
-  UNRELATED: 'UNRELATED'
-});
-
-/**
- * Delta severity classification
- */
-const DeltaSeverity = Object.freeze({
-  NONE: 'NONE',
-  MINOR: 'MINOR',
-  MODERATE: 'MODERATE',
-  MAJOR: 'MAJOR',
-  CRITICAL: 'CRITICAL'
-});
-
-/**
- * Transformation type indicators
- */
-const TransformationType = Object.freeze({
-  LEVEL_CHANGE: 'LEVEL_CHANGE',
-  DYNAMICS: 'DYNAMICS',
-  EQ: 'EQ',
-  REVERB: 'REVERB',
-  STEREO: 'STEREO',
-  FORMAT: 'FORMAT',
-  RESTORATION: 'RESTORATION',
-  MIXED: 'MIXED',
-  UNKNOWN: 'UNKNOWN'
-});
-
-/**
- * Lineage health status
- */
-const LineageHealth = Object.freeze({
-  HEALTHY: 'HEALTHY',
-  DEGRADED: 'DEGRADED',
-  CONCERNING: 'CONCERNING',
-  CRITICAL: 'CRITICAL',
-  UNKNOWN: 'UNKNOWN'
-});
-
-/**
- * Confidence level for analysis
- */
-const Confidence = Object.freeze({
-  HIGH: 'HIGH',
-  MEDIUM: 'MEDIUM',
-  LOW: 'LOW',
-  ESTIMATED: 'ESTIMATED'
-});
 
 // ============================================================================
 // Constants
 // ============================================================================
 
 /**
- * Thresholds for delta classification
+ * Version relationship types
  */
-const DELTA_THRESHOLDS = Object.freeze({
-  lufs: {
-    minor: 1,
-    moderate: 3,
-    major: 6,
-    critical: 12
-  },
-  truePeak: {
-    minor: 0.5,
-    moderate: 1,
-    major: 2,
-    critical: 3
-  },
-  dynamicRange: {
-    minor: 1,
-    moderate: 2,
-    major: 4,
-    critical: 8
-  },
-  stereoWidth: {
-    minor: 0.05,
-    moderate: 0.15,
-    major: 0.30,
-    critical: 0.50
-  },
-  spectralBalance: {
-    minor: 1,
-    moderate: 3,
-    major: 6,
-    critical: 10
-  }
+const VersionRelation = Object.freeze({
+  ORIGINAL: 'ORIGINAL',       // First version in lineage
+  DERIVED: 'DERIVED',         // Derived from parent
+  REMASTER: 'REMASTER',       // Remastered version
+  REMIX: 'REMIX',             // Remix (different arrangement)
+  ALTERNATE: 'ALTERNATE',     // Alternate mix/take
+  REVISION: 'REVISION'        // Minor revision/fix
 });
 
 /**
- * Expected transformation patterns
+ * Processing impact levels
  */
-const TRANSFORMATION_PATTERNS = Object.freeze({
-  [TransformationType.LEVEL_CHANGE]: {
-    expectedMetrics: ['lufs', 'truePeak'],
-    preservedMetrics: ['dynamicRange', 'stereoWidth', 'spectralBalance'],
-    description: 'Gain/level adjustment without dynamic processing'
-  },
-  [TransformationType.DYNAMICS]: {
-    expectedMetrics: ['dynamicRange', 'lufs', 'truePeak'],
-    preservedMetrics: ['stereoWidth', 'spectralBalance'],
-    description: 'Compression, limiting, or expansion'
-  },
-  [TransformationType.EQ]: {
-    expectedMetrics: ['spectralBalance'],
-    preservedMetrics: ['lufs', 'dynamicRange', 'stereoWidth'],
-    description: 'Equalization or tonal adjustments'
-  },
-  [TransformationType.REVERB]: {
-    expectedMetrics: ['dynamicRange', 'stereoWidth'],
-    preservedMetrics: ['lufs'],
-    description: 'Reverb, delay, or spatial effects'
-  },
-  [TransformationType.STEREO]: {
-    expectedMetrics: ['stereoWidth', 'stereoCorrelation'],
-    preservedMetrics: ['lufs', 'dynamicRange', 'spectralBalance'],
-    description: 'Stereo width, pan, or imaging changes'
-  },
-  [TransformationType.FORMAT]: {
-    expectedMetrics: ['sampleRate', 'bitDepth'],
-    preservedMetrics: ['lufs', 'dynamicRange'],
-    description: 'Sample rate or bit depth conversion'
-  },
-  [TransformationType.RESTORATION]: {
-    expectedMetrics: ['noiseFloor', 'artifactCount'],
-    preservedMetrics: ['lufs'],
-    description: 'Noise reduction, de-click, or restoration'
-  }
+const ImpactLevel = Object.freeze({
+  NONE: 'NONE',               // No measurable change
+  MINIMAL: 'MINIMAL',         // < 0.5 dB change
+  LOW: 'LOW',                 // 0.5-1.5 dB change
+  MODERATE: 'MODERATE',       // 1.5-3 dB change
+  HIGH: 'HIGH',               // 3-6 dB change
+  SEVERE: 'SEVERE'            // > 6 dB change
 });
 
 /**
- * Status descriptions for reporting
+ * Quality trend indicators
  */
-const STATUS_DESCRIPTIONS = Object.freeze({
-  [LineageHealth.HEALTHY]: 'All versions maintain expected quality relationships',
-  [LineageHealth.DEGRADED]: 'Minor deviations detected in version lineage',
-  [LineageHealth.CONCERNING]: 'Significant quality changes requiring review',
-  [LineageHealth.CRITICAL]: 'Critical quality issues detected in lineage',
-  [LineageHealth.UNKNOWN]: 'Unable to assess lineage health'
+const QualityTrend = Object.freeze({
+  IMPROVING: 'IMPROVING',
+  STABLE: 'STABLE',
+  DEGRADING: 'DEGRADING',
+  FLUCTUATING: 'FLUCTUATING'
+});
+
+/**
+ * DSP operation categories
+ */
+const DSPCategory = Object.freeze({
+  DYNAMICS: 'DYNAMICS',       // Compression, limiting, expansion
+  EQ: 'EQ',                   // Equalization
+  LOUDNESS: 'LOUDNESS',       // Level changes, normalization
+  SPATIAL: 'SPATIAL',         // Stereo width, panning
+  TIME: 'TIME',               // Reverb, delay
+  DISTORTION: 'DISTORTION',   // Saturation, clipping
+  RESTORATION: 'RESTORATION', // Noise reduction, de-click
+  OTHER: 'OTHER'
+});
+
+/**
+ * Thresholds for change detection
+ */
+const THRESHOLDS = Object.freeze({
+  LOUDNESS_CHANGE_MINIMAL: 0.5,    // dB
+  LOUDNESS_CHANGE_SIGNIFICANT: 2,   // dB
+  PEAK_CHANGE_WARNING: 1,           // dB closer to 0
+  DYNAMIC_RANGE_CHANGE_WARNING: 2,  // dB
+  CREST_FACTOR_CHANGE_WARNING: 1.5, // dB
+  CUMULATIVE_LOUDNESS_WARNING: 4,   // dB total change
+  CUMULATIVE_PEAK_WARNING: 2,       // dB total change
+  MAX_RECOMMENDED_VERSIONS: 5,      // Generation limit warning
+  GENERATION_LOSS_THRESHOLD: 0.3    // dB per generation
 });
 
 // ============================================================================
-// Core Tracking Functions
+// Delta Calculation
 // ============================================================================
 
 /**
- * Build lineage tree from a collection of versions
- * 
- * @param {Object[]} versions - Array of version objects with id and parentId
- * @returns {Object} Lineage tree structure
- */
-function buildLineageTree(versions) {
-  if (!Array.isArray(versions) || versions.length === 0) {
-    return {
-      success: false,
-      error: 'No versions provided',
-      tree: null
-    };
-  }
-
-  const nodeMap = new Map();
-  const roots = [];
-
-  // First pass: create all nodes
-  for (const version of versions) {
-    if (!version || !version.id) continue;
-    
-    nodeMap.set(version.id, {
-      id: version.id,
-      version,
-      parentId: version.parentId || null,
-      children: [],
-      depth: 0,
-      state: version.state || VersionState.DERIVED
-    });
-  }
-
-  // Second pass: build relationships
-  for (const [id, node] of nodeMap) {
-    if (node.parentId && nodeMap.has(node.parentId)) {
-      const parent = nodeMap.get(node.parentId);
-      parent.children.push(node);
-      node.depth = parent.depth + 1;
-    } else if (!node.parentId) {
-      roots.push(node);
-      node.state = VersionState.RAW;
-    }
-  }
-
-  // Calculate max depth
-  let maxDepth = 0;
-  for (const [, node] of nodeMap) {
-    maxDepth = Math.max(maxDepth, node.depth);
-  }
-
-  // Mark leaf nodes as FINAL
-  for (const [, node] of nodeMap) {
-    if (node.children.length === 0 && node.depth > 0) {
-      node.state = VersionState.FINAL;
-    }
-  }
-
-  return {
-    success: true,
-    tree: {
-      roots,
-      nodeMap,
-      totalVersions: versions.length,
-      maxDepth,
-      branchCount: roots.length
-    }
-  };
-}
-
-/**
- * Calculate delta between two versions
- * 
- * @param {Object} fromVersion - Source version with metrics
- * @param {Object} toVersion - Target version with metrics
+ * Calculate DSP delta between two versions
+ * @param {Object} fromVersion - Source version metrics
+ * @param {Object} toVersion - Target version metrics
  * @returns {Object} Delta analysis
  */
 function calculateDelta(fromVersion, toVersion) {
-  if (!fromVersion?.metrics || !toVersion?.metrics) {
-    return {
-      success: false,
-      error: 'Both versions must have metrics',
-      delta: null
-    };
+  if (!fromVersion || !toVersion) {
+    return { error: 'Both versions required for delta calculation' };
   }
 
-  const from = fromVersion.metrics;
-  const to = toVersion.metrics;
   const deltas = {};
-  const severities = [];
+  const changes = [];
+  let totalImpact = 0;
 
-  // Calculate metric deltas
-  const metricPairs = [
-    ['lufs', 'integratedLufs'],
-    ['truePeak', 'truePeakDbtp'],
-    ['dynamicRange', 'loudnessRange'],
-    ['stereoWidth', 'stereoWidth'],
-    ['spectralBalance', 'spectralCentroid']
-  ];
-
-  for (const [key, metricKey] of metricPairs) {
-    const fromVal = from[metricKey] ?? from[key];
-    const toVal = to[metricKey] ?? to[key];
+  // Loudness metrics
+  if (fromVersion.integratedLoudness !== undefined && 
+      toVersion.integratedLoudness !== undefined) {
+    const loudnessDelta = toVersion.integratedLoudness - fromVersion.integratedLoudness;
+    deltas.integratedLoudness = Math.round(loudnessDelta * 100) / 100;
+    totalImpact += Math.abs(loudnessDelta);
     
-    if (fromVal !== undefined && toVal !== undefined) {
-      const diff = toVal - fromVal;
-      const absDiff = Math.abs(diff);
-      const thresholds = DELTA_THRESHOLDS[key];
-      
-      let severity = DeltaSeverity.NONE;
-      if (thresholds) {
-        if (absDiff >= thresholds.critical) {
-          severity = DeltaSeverity.CRITICAL;
-        } else if (absDiff >= thresholds.major) {
-          severity = DeltaSeverity.MAJOR;
-        } else if (absDiff >= thresholds.moderate) {
-          severity = DeltaSeverity.MODERATE;
-        } else if (absDiff >= thresholds.minor) {
-          severity = DeltaSeverity.MINOR;
-        }
-      }
+    if (Math.abs(loudnessDelta) >= THRESHOLDS.LOUDNESS_CHANGE_MINIMAL) {
+      changes.push({
+        metric: 'integratedLoudness',
+        delta: loudnessDelta,
+        direction: loudnessDelta > 0 ? 'INCREASED' : 'DECREASED',
+        significance: Math.abs(loudnessDelta) >= THRESHOLDS.LOUDNESS_CHANGE_SIGNIFICANT 
+          ? 'HIGH' : 'MODERATE'
+      });
+    }
+  }
 
-      deltas[key] = {
-        from: fromVal,
-        to: toVal,
-        delta: Math.round(diff * 1000) / 1000,
-        absChange: Math.round(absDiff * 1000) / 1000,
-        percentChange: fromVal !== 0 ? Math.round((diff / Math.abs(fromVal)) * 10000) / 100 : null,
-        severity
+  // True peak
+  if (fromVersion.truePeak !== undefined && toVersion.truePeak !== undefined) {
+    const peakDelta = toVersion.truePeak - fromVersion.truePeak;
+    deltas.truePeak = Math.round(peakDelta * 100) / 100;
+    
+    if (Math.abs(peakDelta) >= 0.5) {
+      changes.push({
+        metric: 'truePeak',
+        delta: peakDelta,
+        direction: peakDelta > 0 ? 'INCREASED' : 'DECREASED',
+        warning: toVersion.truePeak > -1 ? 'Approaching 0 dBTP' : null
+      });
+    }
+  }
+
+  // Loudness range
+  if (fromVersion.loudnessRange !== undefined && 
+      toVersion.loudnessRange !== undefined) {
+    const lraDelta = toVersion.loudnessRange - fromVersion.loudnessRange;
+    deltas.loudnessRange = Math.round(lraDelta * 100) / 100;
+    
+    if (Math.abs(lraDelta) >= 1) {
+      changes.push({
+        metric: 'loudnessRange',
+        delta: lraDelta,
+        direction: lraDelta > 0 ? 'EXPANDED' : 'COMPRESSED',
+        category: DSPCategory.DYNAMICS
+      });
+    }
+  }
+
+  // Dynamic range / Crest factor
+  if (fromVersion.crestFactor !== undefined && 
+      toVersion.crestFactor !== undefined) {
+    const crestDelta = toVersion.crestFactor - fromVersion.crestFactor;
+    deltas.crestFactor = Math.round(crestDelta * 100) / 100;
+    
+    if (Math.abs(crestDelta) >= 0.5) {
+      changes.push({
+        metric: 'crestFactor',
+        delta: crestDelta,
+        direction: crestDelta > 0 ? 'MORE_DYNAMIC' : 'LESS_DYNAMIC',
+        category: DSPCategory.DYNAMICS
+      });
+    }
+  }
+
+  // Sample rate changes
+  if (fromVersion.sampleRate !== undefined && 
+      toVersion.sampleRate !== undefined) {
+    if (fromVersion.sampleRate !== toVersion.sampleRate) {
+      deltas.sampleRate = {
+        from: fromVersion.sampleRate,
+        to: toVersion.sampleRate,
+        direction: toVersion.sampleRate > fromVersion.sampleRate 
+          ? 'UPSAMPLED' : 'DOWNSAMPLED'
       };
-      
-      severities.push(severity);
+      changes.push({
+        metric: 'sampleRate',
+        ...deltas.sampleRate,
+        warning: toVersion.sampleRate < fromVersion.sampleRate 
+          ? 'Lossy conversion' : null
+      });
     }
   }
 
-  // Determine overall severity
-  const severityOrder = [DeltaSeverity.NONE, DeltaSeverity.MINOR, DeltaSeverity.MODERATE, DeltaSeverity.MAJOR, DeltaSeverity.CRITICAL];
-  const overallSeverity = severities.reduce((max, s) => {
-    return severityOrder.indexOf(s) > severityOrder.indexOf(max) ? s : max;
-  }, DeltaSeverity.NONE);
+  // Bit depth changes
+  if (fromVersion.bitDepth !== undefined && 
+      toVersion.bitDepth !== undefined) {
+    if (fromVersion.bitDepth !== toVersion.bitDepth) {
+      deltas.bitDepth = {
+        from: fromVersion.bitDepth,
+        to: toVersion.bitDepth,
+        direction: toVersion.bitDepth > fromVersion.bitDepth 
+          ? 'INCREASED' : 'DECREASED'
+      };
+      changes.push({
+        metric: 'bitDepth',
+        ...deltas.bitDepth,
+        warning: toVersion.bitDepth < fromVersion.bitDepth 
+          ? 'Reduced resolution' : null
+      });
+    }
+  }
+
+  // Duration changes
+  if (fromVersion.duration !== undefined && 
+      toVersion.duration !== undefined) {
+    const durationDelta = toVersion.duration - fromVersion.duration;
+    if (Math.abs(durationDelta) > 0.1) {
+      deltas.duration = Math.round(durationDelta * 100) / 100;
+      changes.push({
+        metric: 'duration',
+        delta: durationDelta,
+        direction: durationDelta > 0 ? 'LENGTHENED' : 'SHORTENED'
+      });
+    }
+  }
+
+  // Calculate overall impact level
+  const impactLevel = classifyImpact(totalImpact);
 
   return {
-    success: true,
-    fromId: fromVersion.id,
-    toId: toVersion.id,
     deltas,
-    overallSeverity,
-    metricCount: Object.keys(deltas).length,
-    summary: generateDeltaSummary(deltas, overallSeverity)
+    changes,
+    totalImpact: Math.round(totalImpact * 100) / 100,
+    impactLevel,
+    hasSignificantChanges: changes.some(c => c.significance === 'HIGH'),
+    warnings: changes.filter(c => c.warning).map(c => c.warning)
   };
 }
 
 /**
- * Infer transformation type from observed deltas
- * 
- * @param {Object} delta - Delta analysis result
- * @returns {Object} Transformation inference
+ * Classify impact level from total dB change
+ * @param {number} totalImpact - Total impact in dB
+ * @returns {string} Impact level
  */
-function inferTransformation(delta) {
-  if (!delta?.success || !delta.deltas) {
-    return {
-      success: false,
-      error: 'Invalid delta input',
-      transformation: TransformationType.UNKNOWN
-    };
+function classifyImpact(totalImpact) {
+  if (totalImpact < 0.1) return ImpactLevel.NONE;
+  if (totalImpact < 0.5) return ImpactLevel.MINIMAL;
+  if (totalImpact < 1.5) return ImpactLevel.LOW;
+  if (totalImpact < 3) return ImpactLevel.MODERATE;
+  if (totalImpact < 6) return ImpactLevel.HIGH;
+  return ImpactLevel.SEVERE;
+}
+
+// ============================================================================
+// Lineage Analysis
+// ============================================================================
+
+/**
+ * Build complete lineage from version array
+ * @param {Array} versions - Array of version objects with metrics
+ * @returns {Object} Lineage structure
+ */
+function buildLineage(versions) {
+  if (!Array.isArray(versions) || versions.length === 0) {
+    return { error: 'No versions provided' };
   }
 
-  const changedMetrics = [];
-  const unchangedMetrics = [];
+  // Sort by creation date or version number
+  const sorted = [...versions].sort((a, b) => {
+    if (a.createdAt && b.createdAt) {
+      return new Date(a.createdAt) - new Date(b.createdAt);
+    }
+    return (a.versionNumber || 0) - (b.versionNumber || 0);
+  });
 
-  for (const [metric, info] of Object.entries(delta.deltas)) {
-    if (info.severity !== DeltaSeverity.NONE) {
-      changedMetrics.push({ metric, ...info });
+  const lineage = {
+    versions: [],
+    edges: [],
+    root: null
+  };
+
+  for (let i = 0; i < sorted.length; i++) {
+    const version = sorted[i];
+    const node = {
+      id: version.id || `v${i + 1}`,
+      name: version.name || version.versionName || `Version ${i + 1}`,
+      generation: i + 1,
+      relation: i === 0 ? VersionRelation.ORIGINAL : 
+                inferRelation(sorted[i - 1], version),
+      metrics: extractMetrics(version),
+      createdAt: version.createdAt,
+      dspOperations: version.dspOperations || []
+    };
+
+    lineage.versions.push(node);
+
+    if (i === 0) {
+      lineage.root = node.id;
     } else {
-      unchangedMetrics.push(metric);
+      // Create edge from previous version
+      const delta = calculateDelta(
+        extractMetrics(sorted[i - 1]),
+        extractMetrics(version)
+      );
+
+      lineage.edges.push({
+        from: lineage.versions[i - 1].id,
+        to: node.id,
+        delta
+      });
     }
   }
 
-  // Match against known patterns
-  let bestMatch = TransformationType.UNKNOWN;
-  let bestScore = 0;
-  const matches = [];
+  return lineage;
+}
 
-  for (const [type, pattern] of Object.entries(TRANSFORMATION_PATTERNS)) {
-    let score = 0;
-    const expectedHits = changedMetrics.filter(m => 
-      pattern.expectedMetrics.includes(m.metric)
-    ).length;
-    const preservedHits = unchangedMetrics.filter(m =>
-      pattern.preservedMetrics.includes(m)
-    ).length;
-    
-    score = expectedHits * 2 + preservedHits;
-    
-    // Penalty for unexpected changes
-    const unexpectedChanges = changedMetrics.filter(m =>
-      pattern.preservedMetrics.includes(m.metric)
-    ).length;
-    score -= unexpectedChanges * 3;
-
-    if (score > 0) {
-      matches.push({ type, score, pattern });
-    }
-    
-    if (score > bestScore) {
-      bestScore = score;
-      bestMatch = type;
-    }
-  }
-
-  // Check for mixed transformations
-  if (matches.length > 1 && matches[0].score - matches[1].score < 2) {
-    bestMatch = TransformationType.MIXED;
-  }
-
+/**
+ * Extract standard metrics from version object
+ * @param {Object} version - Version object
+ * @returns {Object} Extracted metrics
+ */
+function extractMetrics(version) {
   return {
-    success: true,
-    transformation: bestMatch,
-    confidence: bestScore >= 4 ? Confidence.HIGH : bestScore >= 2 ? Confidence.MEDIUM : Confidence.LOW,
-    changedMetrics: changedMetrics.map(m => m.metric),
-    preservedMetrics: unchangedMetrics,
-    description: TRANSFORMATION_PATTERNS[bestMatch]?.description || 'Unknown transformation applied',
-    matches: matches.slice(0, 3).map(m => ({ type: m.type, score: m.score }))
+    integratedLoudness: version.integratedLoudness ?? version.integrated ?? version.loudness,
+    truePeak: version.truePeak ?? version.truePeakDbfs ?? version.peak,
+    loudnessRange: version.loudnessRange ?? version.lra ?? version.range,
+    crestFactor: version.crestFactor ?? version.crest,
+    sampleRate: version.sampleRate,
+    bitDepth: version.bitDepth,
+    duration: version.duration
   };
 }
 
 /**
- * Trace complete lineage path for a version
- * 
- * @param {Object} tree - Lineage tree from buildLineageTree
- * @param {string} versionId - ID of version to trace
- * @returns {Object} Complete lineage path
+ * Infer version relation type
+ * @param {Object} parent - Parent version
+ * @param {Object} child - Child version
+ * @returns {string} Relation type
  */
-function traceLineage(tree, versionId) {
-  if (!tree?.success || !tree.tree?.nodeMap) {
-    return {
-      success: false,
-      error: 'Invalid lineage tree',
-      path: []
-    };
+function inferRelation(parent, child) {
+  const name = (child.name || child.versionName || '').toLowerCase();
+  
+  if (name.includes('remaster')) return VersionRelation.REMASTER;
+  if (name.includes('remix')) return VersionRelation.REMIX;
+  if (name.includes('alt') || name.includes('alternate')) return VersionRelation.ALTERNATE;
+  if (name.includes('fix') || name.includes('rev')) return VersionRelation.REVISION;
+  
+  // Check for significant metric changes
+  const parentMetrics = extractMetrics(parent);
+  const childMetrics = extractMetrics(child);
+  
+  if (parentMetrics.duration && childMetrics.duration) {
+    const durationChange = Math.abs(childMetrics.duration - parentMetrics.duration);
+    if (durationChange > 30) return VersionRelation.REMIX; // >30s change
   }
-
-  const nodeMap = tree.tree.nodeMap;
-  if (!nodeMap.has(versionId)) {
-    return {
-      success: false,
-      error: `Version ${versionId} not found in lineage`,
-      path: []
-    };
-  }
-
-  // Trace ancestors (up to root)
-  const ancestors = [];
-  let current = nodeMap.get(versionId);
-  while (current.parentId && nodeMap.has(current.parentId)) {
-    const parent = nodeMap.get(current.parentId);
-    ancestors.unshift(parent);
-    current = parent;
-  }
-
-  // Build path
-  const node = nodeMap.get(versionId);
-  const path = [...ancestors, node];
-
-  // Trace descendants
-  const descendants = [];
-  const queue = [...node.children];
-  while (queue.length > 0) {
-    const child = queue.shift();
-    descendants.push(child);
-    queue.push(...child.children);
-  }
-
-  return {
-    success: true,
-    versionId,
-    ancestors: ancestors.map(n => ({ id: n.id, state: n.state, depth: n.depth })),
-    current: { id: node.id, state: node.state, depth: node.depth },
-    descendants: descendants.map(n => ({ id: n.id, state: n.state, depth: n.depth })),
-    path: path.map(n => n.id),
-    depth: node.depth,
-    root: ancestors.length > 0 ? ancestors[0].id : node.id,
-    isRoot: ancestors.length === 0,
-    isLeaf: node.children.length === 0
-  };
-}
-
-/**
- * Determine relationship between two versions
- * 
- * @param {Object} tree - Lineage tree
- * @param {string} versionIdA - First version ID
- * @param {string} versionIdB - Second version ID
- * @returns {Object} Relationship analysis
- */
-function getRelationship(tree, versionIdA, versionIdB) {
-  if (!tree?.success || !tree.tree?.nodeMap) {
-    return {
-      success: false,
-      error: 'Invalid lineage tree',
-      relationship: Relationship.UNRELATED
-    };
-  }
-
-  const nodeMap = tree.tree.nodeMap;
-  if (!nodeMap.has(versionIdA) || !nodeMap.has(versionIdB)) {
-    return {
-      success: false,
-      error: 'One or both versions not found',
-      relationship: Relationship.UNRELATED
-    };
-  }
-
-  if (versionIdA === versionIdB) {
-    return {
-      success: true,
-      relationship: Relationship.UNRELATED,
-      note: 'Same version'
-    };
-  }
-
-  const lineageA = traceLineage(tree, versionIdA);
-  const lineageB = traceLineage(tree, versionIdB);
-
-  // Check parent-child
-  const nodeA = nodeMap.get(versionIdA);
-  const nodeB = nodeMap.get(versionIdB);
-
-  if (nodeA.parentId === versionIdB) {
-    return {
-      success: true,
-      relationship: Relationship.PARENT,
-      note: `${versionIdB} is parent of ${versionIdA}`,
-      distance: 1
-    };
-  }
-
-  if (nodeB.parentId === versionIdA) {
-    return {
-      success: true,
-      relationship: Relationship.CHILD,
-      note: `${versionIdB} is child of ${versionIdA}`,
-      distance: 1
-    };
-  }
-
-  // Check ancestor-descendant
-  if (lineageA.path.includes(versionIdB)) {
-    return {
-      success: true,
-      relationship: Relationship.ANCESTOR,
-      note: `${versionIdB} is ancestor of ${versionIdA}`,
-      distance: lineageA.path.indexOf(versionIdB) - lineageA.path.length + 1
-    };
-  }
-
-  if (lineageB.path.includes(versionIdA)) {
-    return {
-      success: true,
-      relationship: Relationship.DESCENDANT,
-      note: `${versionIdB} is descendant of ${versionIdA}`,
-      distance: lineageB.path.indexOf(versionIdA) - lineageB.path.length + 1
-    };
-  }
-
-  // Check sibling (same parent)
-  if (nodeA.parentId && nodeA.parentId === nodeB.parentId) {
-    return {
-      success: true,
-      relationship: Relationship.SIBLING,
-      note: 'Versions share the same parent',
-      commonParent: nodeA.parentId
-    };
-  }
-
-  // Check for common ancestor
-  const commonAncestor = lineageA.path.find(id => lineageB.path.includes(id));
-  if (commonAncestor) {
-    return {
-      success: true,
-      relationship: Relationship.SIBLING,
-      note: 'Versions share a common ancestor',
-      commonAncestor
-    };
-  }
-
-  return {
-    success: true,
-    relationship: Relationship.UNRELATED,
-    note: 'No lineage relationship found'
-  };
+  
+  return VersionRelation.DERIVED;
 }
 
 // ============================================================================
-// Analysis Functions
+// Cumulative Impact Analysis
 // ============================================================================
 
 /**
- * Analyze lineage health across all versions
- * 
- * @param {Object[]} versions - Array of versions with metrics
- * @returns {Object} Lineage health analysis
+ * Calculate cumulative impact across entire lineage
+ * @param {Object} lineage - Lineage from buildLineage()
+ * @returns {Object} Cumulative impact analysis
  */
-function analyzeLineageHealth(versions) {
-  if (!Array.isArray(versions) || versions.length < 2) {
+function calculateCumulativeImpact(lineage) {
+  if (lineage.error) {
+    return { error: lineage.error };
+  }
+
+  if (lineage.versions.length < 2) {
     return {
-      success: false,
-      error: 'At least 2 versions required for health analysis',
-      health: LineageHealth.UNKNOWN
+      generations: lineage.versions.length,
+      cumulativeDeltas: {},
+      totalImpact: 0,
+      impactLevel: ImpactLevel.NONE,
+      perGenerationLoss: 0
     };
   }
 
-  const tree = buildLineageTree(versions);
-  if (!tree.success) {
-    return {
-      success: false,
-      error: tree.error,
-      health: LineageHealth.UNKNOWN
-    };
+  const original = lineage.versions[0].metrics;
+  const latest = lineage.versions[lineage.versions.length - 1].metrics;
+
+  // Calculate total delta from original to latest
+  const totalDelta = calculateDelta(original, latest);
+
+  // Calculate per-generation metrics
+  const generations = lineage.versions.length;
+  const perGenLoss = totalDelta.totalImpact / (generations - 1);
+
+  // Track cumulative changes
+  const cumulativeDeltas = {
+    loudness: 0,
+    peak: 0,
+    dynamicRange: 0
+  };
+
+  for (const edge of lineage.edges) {
+    if (edge.delta.deltas.integratedLoudness) {
+      cumulativeDeltas.loudness += Math.abs(edge.delta.deltas.integratedLoudness);
+    }
+    if (edge.delta.deltas.truePeak) {
+      cumulativeDeltas.peak += Math.abs(edge.delta.deltas.truePeak);
+    }
+    if (edge.delta.deltas.loudnessRange) {
+      cumulativeDeltas.dynamicRange += Math.abs(edge.delta.deltas.loudnessRange);
+    }
   }
 
-  const versionMap = new Map(versions.map(v => [v.id, v]));
-  const issues = [];
-  const transitions = [];
-
-  // Analyze each parent-child pair
-  for (const [, node] of tree.tree.nodeMap) {
-    if (!node.parentId) continue;
-
-    const fromVersion = versionMap.get(node.parentId);
-    const toVersion = versionMap.get(node.id);
-
-    if (!fromVersion?.metrics || !toVersion?.metrics) continue;
-
-    const delta = calculateDelta(fromVersion, toVersion);
-    if (!delta.success) continue;
-
-    const transformation = inferTransformation(delta);
-
-    transitions.push({
-      from: node.parentId,
-      to: node.id,
-      delta,
-      transformation,
-      severity: delta.overallSeverity
+  // Generate warnings
+  const warnings = [];
+  
+  if (cumulativeDeltas.loudness > THRESHOLDS.CUMULATIVE_LOUDNESS_WARNING) {
+    warnings.push({
+      type: 'CUMULATIVE_LOUDNESS',
+      message: `Cumulative loudness change of ${cumulativeDeltas.loudness.toFixed(1)} dB exceeds recommended threshold`,
+      value: cumulativeDeltas.loudness
     });
-
-    // Flag issues
-    if (delta.overallSeverity === DeltaSeverity.CRITICAL) {
-      issues.push({
-        type: 'critical_delta',
-        from: node.parentId,
-        to: node.id,
-        message: `Critical quality change detected between versions`,
-        severity: 'high'
-      });
-    } else if (delta.overallSeverity === DeltaSeverity.MAJOR) {
-      issues.push({
-        type: 'major_delta',
-        from: node.parentId,
-        to: node.id,
-        message: `Major quality change detected between versions`,
-        severity: 'medium'
-      });
-    }
-
-    // Check for unexpected metric changes
-    if (transformation.transformation !== TransformationType.UNKNOWN) {
-      const pattern = TRANSFORMATION_PATTERNS[transformation.transformation];
-      if (pattern) {
-        for (const preserved of pattern.preservedMetrics) {
-          const deltaInfo = delta.deltas[preserved];
-          if (deltaInfo && deltaInfo.severity !== DeltaSeverity.NONE) {
-            issues.push({
-              type: 'unexpected_change',
-              from: node.parentId,
-              to: node.id,
-              metric: preserved,
-              message: `${preserved} changed unexpectedly during ${transformation.transformation}`,
-              severity: 'low'
-            });
-          }
-        }
-      }
-    }
   }
 
-  // Determine overall health
-  let health = LineageHealth.HEALTHY;
-  const criticalCount = issues.filter(i => i.severity === 'high').length;
-  const mediumCount = issues.filter(i => i.severity === 'medium').length;
-  const lowCount = issues.filter(i => i.severity === 'low').length;
+  if (cumulativeDeltas.peak > THRESHOLDS.CUMULATIVE_PEAK_WARNING) {
+    warnings.push({
+      type: 'CUMULATIVE_PEAK',
+      message: `Cumulative peak change of ${cumulativeDeltas.peak.toFixed(1)} dB may indicate quality degradation`,
+      value: cumulativeDeltas.peak
+    });
+  }
 
-  if (criticalCount > 0) {
-    health = LineageHealth.CRITICAL;
-  } else if (mediumCount >= 2 || (mediumCount >= 1 && lowCount >= 3)) {
-    health = LineageHealth.CONCERNING;
-  } else if (mediumCount > 0 || lowCount >= 2) {
-    health = LineageHealth.DEGRADED;
+  if (generations > THRESHOLDS.MAX_RECOMMENDED_VERSIONS) {
+    warnings.push({
+      type: 'EXCESSIVE_GENERATIONS',
+      message: `${generations} generations exceeds recommended maximum of ${THRESHOLDS.MAX_RECOMMENDED_VERSIONS}`,
+      value: generations
+    });
+  }
+
+  if (perGenLoss > THRESHOLDS.GENERATION_LOSS_THRESHOLD) {
+    warnings.push({
+      type: 'HIGH_GENERATION_LOSS',
+      message: `Per-generation loss of ${perGenLoss.toFixed(2)} dB is above threshold`,
+      value: perGenLoss
+    });
   }
 
   return {
-    success: true,
-    health,
-    healthDescription: STATUS_DESCRIPTIONS[health],
-    summary: {
-      totalVersions: versions.length,
-      analyzedTransitions: transitions.length,
-      issueCount: issues.length,
-      criticalIssues: criticalCount,
-      mediumIssues: mediumCount,
-      lowIssues: lowCount
+    generations,
+    totalDelta,
+    cumulativeDeltas: {
+      loudness: Math.round(cumulativeDeltas.loudness * 100) / 100,
+      peak: Math.round(cumulativeDeltas.peak * 100) / 100,
+      dynamicRange: Math.round(cumulativeDeltas.dynamicRange * 100) / 100
     },
-    issues,
-    transitions,
-    tree: tree.tree
-  };
-}
-
-/**
- * Find all versions matching specific criteria in lineage
- * 
- * @param {Object} tree - Lineage tree
- * @param {Object} criteria - Search criteria
- * @returns {Object} Matching versions
- */
-function findVersions(tree, criteria = {}) {
-  if (!tree?.success || !tree.tree?.nodeMap) {
-    return {
-      success: false,
-      error: 'Invalid lineage tree',
-      matches: []
-    };
-  }
-
-  const matches = [];
-
-  for (const [, node] of tree.tree.nodeMap) {
-    let match = true;
-
-    if (criteria.state && node.state !== criteria.state) {
-      match = false;
-    }
-    if (criteria.minDepth !== undefined && node.depth < criteria.minDepth) {
-      match = false;
-    }
-    if (criteria.maxDepth !== undefined && node.depth > criteria.maxDepth) {
-      match = false;
-    }
-    if (criteria.isLeaf !== undefined && (node.children.length === 0) !== criteria.isLeaf) {
-      match = false;
-    }
-    if (criteria.isRoot !== undefined && (!node.parentId) !== criteria.isRoot) {
-      match = false;
-    }
-
-    if (match) {
-      matches.push({
-        id: node.id,
-        state: node.state,
-        depth: node.depth,
-        childCount: node.children.length,
-        parentId: node.parentId
-      });
-    }
-  }
-
-  return {
-    success: true,
-    matches,
-    matchCount: matches.length,
-    criteria
-  };
-}
-
-/**
- * Compare two branches in the lineage
- * 
- * @param {Object[]} versions - All versions with metrics
- * @param {string} branchARoot - Root version ID for branch A
- * @param {string} branchBRoot - Root version ID for branch B
- * @returns {Object} Branch comparison
- */
-function compareBranches(versions, branchARoot, branchBRoot) {
-  if (!Array.isArray(versions)) {
-    return {
-      success: false,
-      error: 'Versions array required',
-      comparison: null
-    };
-  }
-
-  const tree = buildLineageTree(versions);
-  if (!tree.success) {
-    return tree;
-  }
-
-  const versionMap = new Map(versions.map(v => [v.id, v]));
-
-  // Get all versions in each branch
-  const getBranchVersions = (rootId) => {
-    const result = [];
-    const queue = [tree.tree.nodeMap.get(rootId)];
-    while (queue.length > 0) {
-      const node = queue.shift();
-      if (node) {
-        result.push(node.id);
-        queue.push(...node.children);
-      }
-    }
-    return result;
-  };
-
-  const branchA = getBranchVersions(branchARoot);
-  const branchB = getBranchVersions(branchBRoot);
-
-  if (branchA.length === 0 || branchB.length === 0) {
-    return {
-      success: false,
-      error: 'One or both branches not found',
-      comparison: null
-    };
-  }
-
-  // Calculate aggregate metrics for each branch
-  const calculateBranchMetrics = (branchIds) => {
-    const metrics = { lufs: [], dynamicRange: [], truePeak: [] };
-    for (const id of branchIds) {
-      const v = versionMap.get(id);
-      if (v?.metrics) {
-        if (v.metrics.integratedLufs !== undefined) metrics.lufs.push(v.metrics.integratedLufs);
-        if (v.metrics.loudnessRange !== undefined) metrics.dynamicRange.push(v.metrics.loudnessRange);
-        if (v.metrics.truePeakDbtp !== undefined) metrics.truePeak.push(v.metrics.truePeakDbtp);
-      }
-    }
-    return {
-      avgLufs: metrics.lufs.length > 0 ? metrics.lufs.reduce((a, b) => a + b, 0) / metrics.lufs.length : null,
-      avgDynamicRange: metrics.dynamicRange.length > 0 ? metrics.dynamicRange.reduce((a, b) => a + b, 0) / metrics.dynamicRange.length : null,
-      maxTruePeak: metrics.truePeak.length > 0 ? Math.max(...metrics.truePeak) : null,
-      versionCount: branchIds.length
-    };
-  };
-
-  const metricsA = calculateBranchMetrics(branchA);
-  const metricsB = calculateBranchMetrics(branchB);
-
-  return {
-    success: true,
-    branchA: {
-      root: branchARoot,
-      versions: branchA,
-      metrics: metricsA
-    },
-    branchB: {
-      root: branchBRoot,
-      versions: branchB,
-      metrics: metricsB
-    },
-    comparison: {
-      lufsDelta: metricsA.avgLufs !== null && metricsB.avgLufs !== null 
-        ? Math.round((metricsB.avgLufs - metricsA.avgLufs) * 100) / 100 : null,
-      dynamicRangeDelta: metricsA.avgDynamicRange !== null && metricsB.avgDynamicRange !== null
-        ? Math.round((metricsB.avgDynamicRange - metricsA.avgDynamicRange) * 100) / 100 : null,
-      truePeakDelta: metricsA.maxTruePeak !== null && metricsB.maxTruePeak !== null
-        ? Math.round((metricsB.maxTruePeak - metricsA.maxTruePeak) * 100) / 100 : null
-    }
+    totalImpact: totalDelta.totalImpact,
+    impactLevel: totalDelta.impactLevel,
+    perGenerationLoss: Math.round(perGenLoss * 100) / 100,
+    warnings
   };
 }
 
 // ============================================================================
-// Quick Check Functions
+// Pattern Detection
 // ============================================================================
 
 /**
- * Quick lineage check for a version
- * 
- * @param {Object[]} versions - All versions
- * @param {string} versionId - Version to check
- * @returns {Object} Quick status
+ * Detect processing patterns across versions
+ * @param {Object} lineage - Lineage from buildLineage()
+ * @returns {Object} Pattern analysis
  */
-function quickCheck(versions, versionId) {
-  if (!Array.isArray(versions) || !versionId) {
-    return {
-      valid: false,
-      error: 'Versions array and versionId required'
-    };
+function detectPatterns(lineage) {
+  if (lineage.error || lineage.versions.length < 2) {
+    return { patterns: [], trend: QualityTrend.STABLE };
   }
 
-  const tree = buildLineageTree(versions);
-  if (!tree.success) {
-    return {
-      valid: false,
-      error: tree.error
-    };
+  const patterns = [];
+  const loudnessChanges = [];
+  const dynamicChanges = [];
+
+  // Collect changes
+  for (const edge of lineage.edges) {
+    if (edge.delta.deltas.integratedLoudness) {
+      loudnessChanges.push(edge.delta.deltas.integratedLoudness);
+    }
+    if (edge.delta.deltas.loudnessRange) {
+      dynamicChanges.push(edge.delta.deltas.loudnessRange);
+    }
   }
 
-  const lineage = traceLineage(tree, versionId);
-  if (!lineage.success) {
-    return {
-      valid: false,
-      error: lineage.error
-    };
-  }
+  // Pattern: Consistent loudness increase (loudness war behavior)
+  if (loudnessChanges.length >= 2) {
+    const allIncreasing = loudnessChanges.every(c => c > 0.3);
+    const allDecreasing = loudnessChanges.every(c => c < -0.3);
+    const totalLoudnessChange = loudnessChanges.reduce((a, b) => a + b, 0);
 
-  const version = versions.find(v => v.id === versionId);
-  const parent = lineage.ancestors.length > 0 
-    ? versions.find(v => v.id === lineage.ancestors[lineage.ancestors.length - 1].id)
-    : null;
+    if (allIncreasing && totalLoudnessChange > 2) {
+      patterns.push({
+        type: 'LOUDNESS_ESCALATION',
+        description: 'Progressive loudness increase across versions',
+        severity: 'WARNING',
+        totalChange: totalLoudnessChange
+      });
+    }
 
-  let lastDelta = null;
-  if (parent && version?.metrics && parent?.metrics) {
-    lastDelta = calculateDelta(parent, version);
-  }
-
-  return {
-    valid: true,
-    versionId,
-    state: lineage.current.state,
-    depth: lineage.depth,
-    isRoot: lineage.isRoot,
-    isLeaf: lineage.isLeaf,
-    ancestorCount: lineage.ancestors.length,
-    descendantCount: lineage.descendants.length,
-    lastTransition: lastDelta?.success ? {
-      from: parent.id,
-      severity: lastDelta.overallSeverity
-    } : null,
-    path: lineage.path
-  };
-}
-
-/**
- * Validate lineage integrity
- * 
- * @param {Object[]} versions - All versions
- * @returns {Object} Integrity check result
- */
-function validateIntegrity(versions) {
-  if (!Array.isArray(versions)) {
-    return {
-      valid: false,
-      error: 'Versions array required',
-      issues: []
-    };
-  }
-
-  const issues = [];
-  const idSet = new Set(versions.map(v => v.id));
-
-  // Check for orphaned references
-  for (const version of versions) {
-    if (version.parentId && !idSet.has(version.parentId)) {
-      issues.push({
-        type: 'orphan_reference',
-        versionId: version.id,
-        message: `Parent ${version.parentId} not found in versions`
+    if (allDecreasing && totalLoudnessChange < -3) {
+      patterns.push({
+        type: 'LOUDNESS_REDUCTION',
+        description: 'Progressive loudness decrease (possible remastering)',
+        severity: 'INFO',
+        totalChange: totalLoudnessChange
       });
     }
   }
 
-  // Check for cycles
-  for (const version of versions) {
-    const visited = new Set();
-    let current = version;
-    while (current && current.parentId) {
-      if (visited.has(current.id)) {
-        issues.push({
-          type: 'cycle_detected',
-          versionId: version.id,
-          message: 'Circular reference detected in lineage'
-        });
-        break;
-      }
-      visited.add(current.id);
-      current = versions.find(v => v.id === current.parentId);
+  // Pattern: Consistent dynamic range reduction
+  if (dynamicChanges.length >= 2) {
+    const allCompressing = dynamicChanges.every(c => c < -0.5);
+    const totalDRChange = dynamicChanges.reduce((a, b) => a + b, 0);
+
+    if (allCompressing && totalDRChange < -2) {
+      patterns.push({
+        type: 'DYNAMIC_COMPRESSION',
+        description: 'Progressive dynamic range compression',
+        severity: 'WARNING',
+        totalChange: totalDRChange
+      });
     }
   }
 
-  // Check for duplicate IDs
-  const duplicates = versions.filter((v, i) => 
-    versions.findIndex(v2 => v2.id === v.id) !== i
+  // Pattern: Oscillating changes (back and forth)
+  if (loudnessChanges.length >= 3) {
+    let oscillations = 0;
+    for (let i = 1; i < loudnessChanges.length; i++) {
+      if ((loudnessChanges[i] > 0) !== (loudnessChanges[i - 1] > 0)) {
+        oscillations++;
+      }
+    }
+
+    if (oscillations >= loudnessChanges.length - 1) {
+      patterns.push({
+        type: 'OSCILLATING_CHANGES',
+        description: 'Inconsistent processing - changes reversed between versions',
+        severity: 'WARNING'
+      });
+    }
+  }
+
+  // Pattern: Sample rate degradation
+  const sampleRates = lineage.versions
+    .map(v => v.metrics.sampleRate)
+    .filter(s => s !== undefined);
+    
+  if (sampleRates.length >= 2) {
+    const degrading = sampleRates.slice(1).every((s, i) => s <= sampleRates[i]);
+    const final = sampleRates[sampleRates.length - 1];
+    const original = sampleRates[0];
+    
+    if (degrading && final < original) {
+      patterns.push({
+        type: 'SAMPLE_RATE_DEGRADATION',
+        description: `Sample rate reduced from ${original} to ${final} Hz`,
+        severity: final < 44100 ? 'ERROR' : 'WARNING'
+      });
+    }
+  }
+
+  // Determine overall quality trend
+  const trend = determineQualityTrend(lineage, patterns);
+
+  return {
+    patterns,
+    patternCount: patterns.length,
+    trend,
+    hasWarnings: patterns.some(p => p.severity === 'WARNING'),
+    hasErrors: patterns.some(p => p.severity === 'ERROR')
+  };
+}
+
+/**
+ * Determine overall quality trend
+ * @param {Object} lineage - Lineage structure
+ * @param {Array} patterns - Detected patterns
+ * @returns {string} Quality trend
+ */
+function determineQualityTrend(lineage, patterns) {
+  const hasNegativePatterns = patterns.some(p => 
+    p.severity === 'WARNING' || p.severity === 'ERROR'
   );
-  for (const dup of duplicates) {
-    issues.push({
-      type: 'duplicate_id',
-      versionId: dup.id,
-      message: 'Duplicate version ID found'
+  
+  const hasOscillating = patterns.some(p => 
+    p.type === 'OSCILLATING_CHANGES'
+  );
+  
+  const hasLoudnessReduction = patterns.some(p => 
+    p.type === 'LOUDNESS_REDUCTION'
+  );
+
+  if (hasOscillating) return QualityTrend.FLUCTUATING;
+  if (hasNegativePatterns) return QualityTrend.DEGRADING;
+  if (hasLoudnessReduction) return QualityTrend.IMPROVING;
+  
+  return QualityTrend.STABLE;
+}
+
+// ============================================================================
+// DSP Operation Tracking
+// ============================================================================
+
+/**
+ * Track DSP operations applied between versions
+ * @param {Object} fromVersion - Source version
+ * @param {Object} toVersion - Target version with dspOperations
+ * @returns {Object} DSP operation summary
+ */
+function trackDSPOperations(fromVersion, toVersion) {
+  const operations = toVersion.dspOperations || [];
+  
+  if (operations.length === 0) {
+    return {
+      operations: [],
+      categories: {},
+      estimatedImpact: ImpactLevel.NONE
+    };
+  }
+
+  // Categorize operations
+  const categories = {};
+  for (const op of operations) {
+    const category = op.category || categorizeOperation(op.name || op.type);
+    categories[category] = categories[category] || [];
+    categories[category].push(op);
+  }
+
+  // Estimate impact from operation types
+  let impactScore = 0;
+  for (const op of operations) {
+    impactScore += estimateOperationImpact(op);
+  }
+
+  return {
+    operations,
+    operationCount: operations.length,
+    categories,
+    categoryBreakdown: Object.entries(categories).map(([cat, ops]) => ({
+      category: cat,
+      count: ops.length
+    })),
+    estimatedImpact: classifyImpact(impactScore)
+  };
+}
+
+/**
+ * Categorize a DSP operation by name
+ * @param {string} operationName - Operation name
+ * @returns {string} DSP category
+ */
+function categorizeOperation(operationName) {
+  const name = (operationName || '').toLowerCase();
+  
+  if (/compressor|limiter|gate|expander|dynamics/.test(name)) {
+    return DSPCategory.DYNAMICS;
+  }
+  if (/eq|equalizer|filter|low.?pass|high.?pass|shelf|bell/.test(name)) {
+    return DSPCategory.EQ;
+  }
+  if (/gain|level|loudness|normalize|lufs/.test(name)) {
+    return DSPCategory.LOUDNESS;
+  }
+  if (/stereo|pan|width|mid.?side|spatial/.test(name)) {
+    return DSPCategory.SPATIAL;
+  }
+  if (/reverb|delay|echo/.test(name)) {
+    return DSPCategory.TIME;
+  }
+  if (/saturat|distort|overdrive|clip|tape/.test(name)) {
+    return DSPCategory.DISTORTION;
+  }
+  if (/de.?noise|de.?click|restoration|repair/.test(name)) {
+    return DSPCategory.RESTORATION;
+  }
+  
+  return DSPCategory.OTHER;
+}
+
+/**
+ * Estimate impact score from operation
+ * @param {Object} operation - DSP operation
+ * @returns {number} Impact score
+ */
+function estimateOperationImpact(operation) {
+  const category = operation.category || categorizeOperation(operation.name);
+  
+  // Base impact by category
+  const categoryImpact = {
+    [DSPCategory.DYNAMICS]: 1.5,
+    [DSPCategory.EQ]: 1.0,
+    [DSPCategory.LOUDNESS]: 2.0,
+    [DSPCategory.SPATIAL]: 0.5,
+    [DSPCategory.TIME]: 0.5,
+    [DSPCategory.DISTORTION]: 1.5,
+    [DSPCategory.RESTORATION]: 0.3,
+    [DSPCategory.OTHER]: 0.5
+  };
+
+  return categoryImpact[category] || 0.5;
+}
+
+// ============================================================================
+// Quick Check
+// ============================================================================
+
+/**
+ * Quick lineage check
+ * @param {Array} versions - Version array
+ * @returns {Object} Quick check result
+ */
+function quickCheck(versions) {
+  const lineage = buildLineage(versions);
+  
+  if (lineage.error) {
+    return { error: lineage.error };
+  }
+
+  const impact = calculateCumulativeImpact(lineage);
+  const patterns = detectPatterns(lineage);
+
+  return {
+    generations: lineage.versions.length,
+    totalImpact: impact.totalImpact,
+    impactLevel: impact.impactLevel,
+    trend: patterns.trend,
+    hasWarnings: patterns.hasWarnings || impact.warnings.length > 0,
+    warningCount: patterns.patterns.filter(p => p.severity === 'WARNING').length + 
+                  impact.warnings.length,
+    patternCount: patterns.patternCount
+  };
+}
+
+// ============================================================================
+// Full Analysis
+// ============================================================================
+
+/**
+ * Complete lineage analysis
+ * @param {Array} versions - Version array
+ * @param {Object} options - Analysis options
+ * @returns {Object} Complete analysis
+ */
+function analyze(versions, options = {}) {
+  const lineage = buildLineage(versions);
+  
+  if (lineage.error) {
+    return { error: lineage.error };
+  }
+
+  const cumulativeImpact = calculateCumulativeImpact(lineage);
+  const patterns = detectPatterns(lineage);
+
+  // Generate recommendations
+  const recommendations = [];
+
+  if (cumulativeImpact.impactLevel === ImpactLevel.SEVERE) {
+    recommendations.push({
+      priority: 'HIGH',
+      message: 'Consider reverting to earlier version - cumulative processing impact is severe'
     });
   }
 
-  return {
-    valid: issues.length === 0,
-    integrity: issues.length === 0 ? 'valid' : 'invalid',
-    issues,
-    stats: {
-      totalVersions: versions.length,
-      uniqueIds: idSet.size,
-      issueCount: issues.length
-    }
-  };
-}
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Generate human-readable delta summary
- */
-function generateDeltaSummary(deltas, severity) {
-  const changes = Object.entries(deltas)
-    .filter(([, info]) => info.severity !== DeltaSeverity.NONE)
-    .map(([metric, info]) => `${metric}: ${info.delta > 0 ? '+' : ''}${info.delta}`);
-
-  if (changes.length === 0) {
-    return 'No significant changes detected';
+  if (patterns.trend === QualityTrend.DEGRADING) {
+    recommendations.push({
+      priority: 'HIGH',
+      message: 'Quality degradation detected across versions - review processing chain'
+    });
   }
 
-  const severityText = {
-    [DeltaSeverity.MINOR]: 'Minor',
-    [DeltaSeverity.MODERATE]: 'Moderate',
-    [DeltaSeverity.MAJOR]: 'Major',
-    [DeltaSeverity.CRITICAL]: 'Critical'
-  };
+  if (patterns.trend === QualityTrend.FLUCTUATING) {
+    recommendations.push({
+      priority: 'MEDIUM',
+      message: 'Inconsistent processing detected - establish standardized workflow'
+    });
+  }
 
-  return `${severityText[severity] || 'Notable'} changes: ${changes.join(', ')}`;
-}
+  if (cumulativeImpact.generations > THRESHOLDS.MAX_RECOMMENDED_VERSIONS) {
+    recommendations.push({
+      priority: 'MEDIUM',
+      message: `${cumulativeImpact.generations} generations is high - consider consolidating versions`
+    });
+  }
 
-/**
- * Format version info for display
- */
-function formatVersionInfo(node) {
+  for (const warning of cumulativeImpact.warnings) {
+    if (warning.type === 'HIGH_GENERATION_LOSS') {
+      recommendations.push({
+        priority: 'MEDIUM',
+        message: 'Per-generation quality loss detected - minimize round-trips'
+      });
+    }
+  }
+
+  // Build version summary
+  const versionSummary = lineage.versions.map((v, i) => ({
+    id: v.id,
+    name: v.name,
+    generation: v.generation,
+    relation: v.relation,
+    delta: i > 0 ? lineage.edges[i - 1].delta.impactLevel : null
+  }));
+
   return {
-    id: node.id,
-    state: node.state,
-    depth: node.depth,
-    hasChildren: node.children.length > 0,
-    hasParent: !!node.parentId
+    lineage,
+    versionCount: lineage.versions.length,
+    versionSummary,
+    cumulativeImpact,
+    patterns: patterns.patterns,
+    trend: patterns.trend,
+    recommendations,
+    summary: {
+      generations: cumulativeImpact.generations,
+      totalImpact: cumulativeImpact.totalImpact,
+      impactLevel: cumulativeImpact.impactLevel,
+      trend: patterns.trend,
+      patternCount: patterns.patternCount,
+      warningCount: cumulativeImpact.warnings.length + 
+                    patterns.patterns.filter(p => p.severity === 'WARNING').length
+    },
+    analyzedAt: new Date().toISOString()
   };
 }
 
@@ -1028,35 +820,35 @@ function formatVersionInfo(node) {
 // ============================================================================
 
 module.exports = {
-  // Enums
-  VersionState,
-  Relationship,
-  DeltaSeverity,
-  TransformationType,
-  LineageHealth,
-  Confidence,
+  // Main analysis
+  analyze,
+  quickCheck,
+  
+  // Delta calculation
+  calculateDelta,
+  classifyImpact,
+  
+  // Lineage building
+  buildLineage,
+  extractMetrics,
+  inferRelation,
+  
+  // Impact analysis
+  calculateCumulativeImpact,
+  
+  // Pattern detection
+  detectPatterns,
+  determineQualityTrend,
+  
+  // DSP tracking
+  trackDSPOperations,
+  categorizeOperation,
+  estimateOperationImpact,
   
   // Constants
-  DELTA_THRESHOLDS,
-  TRANSFORMATION_PATTERNS,
-  STATUS_DESCRIPTIONS,
-  
-  // Core functions
-  buildLineageTree,
-  calculateDelta,
-  inferTransformation,
-  traceLineage,
-  getRelationship,
-  
-  // Analysis functions
-  analyzeLineageHealth,
-  findVersions,
-  compareBranches,
-  
-  // Quick check functions
-  quickCheck,
-  validateIntegrity,
-  
-  // Helpers
-  formatVersionInfo
+  VersionRelation,
+  ImpactLevel,
+  QualityTrend,
+  DSPCategory,
+  THRESHOLDS
 };

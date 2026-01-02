@@ -1,142 +1,265 @@
+/**
+ * App.css - StudioOS Dashboard Styles
+ * Dark theme, enterprise-calm, decision-oriented
+ */
+
+@import './styles/design-system.css';
+
 #root {
   width: 100%;
   height: 100vh;
 }
 
-/* Dashboard Layout */
+/* ============================================================================
+ * Dark Theme Enforcement
+ * ============================================================================ */
+
+:root {
+  color-scheme: dark;
+  
+  /* Override to always use dark mode */
+  --color-background: var(--color-gray-900);
+  --color-background-subtle: var(--color-gray-800);
+  --color-background-muted: var(--color-gray-700);
+  --color-surface: var(--color-gray-800);
+  --color-surface-subtle: var(--color-gray-700);
+  
+  --color-text-primary: var(--color-gray-100);
+  --color-text-secondary: var(--color-gray-400);
+  --color-text-muted: var(--color-gray-500);
+  --color-text-inverse: var(--color-gray-900);
+  
+  --color-border: var(--color-gray-700);
+  --color-border-subtle: var(--color-gray-800);
+  --color-border-strong: var(--color-gray-600);
+  
+  /* Additional dark colors */
+  --color-gray-950: #0a0a0a;
+}
+
+body {
+  background-color: var(--color-gray-950);
+  color: var(--color-text-primary);
+}
+
+/* ============================================================================
+ * Navigation Header/Footer Content
+ * ============================================================================ */
+
+.nav-header-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.nav-logo {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-white);
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.nav-role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-2);
+  background-color: var(--color-primary);
+  border-radius: var(--border-radius);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-white);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  width: fit-content;
+}
+
+.nav-role-badge.external {
+  background-color: #8b5cf6;
+}
+
+.nav-footer-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.nav-user-email {
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-400);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-logout-btn {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background-color: transparent;
+  border: 1px solid var(--color-gray-700);
+  border-radius: var(--border-radius);
+  color: var(--color-gray-300);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: 
+    background-color var(--duration-150) var(--ease-out),
+    border-color var(--duration-150) var(--ease-out),
+    color var(--duration-150) var(--ease-out);
+}
+
+.nav-logout-btn:hover {
+  background-color: var(--color-danger);
+  border-color: var(--color-danger);
+  color: var(--color-white);
+}
+
+/* ============================================================================
+ * Loading Screen
+ * ============================================================================ */
+
+.loading-screen {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: var(--font-size-lg);
+  color: var(--color-gray-400);
+  background-color: var(--color-gray-950);
+}
+
+/* ============================================================================
+ * View Common Styles
+ * ============================================================================ */
+
+.view-loading,
+.view-error {
+  padding: var(--space-10);
+  text-align: center;
+  color: var(--color-gray-400);
+}
+
+.view-error {
+  color: var(--color-danger);
+}
+
+/* ============================================================================
+ * Legacy Dashboard Layout (fallback)
+ * ============================================================================ */
+
 .dashboard-layout {
   display: flex;
   height: 100vh;
-  background: #f5f5f5;
+  background: var(--color-gray-950);
 }
 
 .sidebar {
   width: 240px;
-  background: #1a1a2e;
-  color: #fff;
+  background: var(--color-gray-900);
+  color: var(--color-white);
   display: flex;
   flex-direction: column;
+  border-right: 1px solid var(--color-gray-800);
 }
 
 .sidebar-header {
-  padding: 20px;
-  border-bottom: 1px solid #2d2d44;
+  padding: var(--space-5);
+  border-bottom: 1px solid var(--color-gray-800);
 }
 
 .sidebar-header h1 {
-  margin: 0 0 8px 0;
-  font-size: 1.5rem;
+  margin: 0 0 var(--space-2) 0;
+  font-size: var(--font-size-xl);
 }
 
 .role-badge {
   display: inline-block;
-  padding: 4px 8px;
-  background: #4a4ae8;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-primary);
+  border-radius: var(--border-radius);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
 }
 
 .role-badge.external {
-  background: #e84a9b;
+  background: #8b5cf6;
 }
 
 .sidebar-nav {
   flex: 1;
-  padding: 16px 0;
+  padding: var(--space-4) 0;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   width: 100%;
-  padding: 12px 20px;
+  padding: var(--space-3) var(--space-5);
   background: none;
   border: none;
-  color: #a0a0b8;
+  color: var(--color-gray-400);
   cursor: pointer;
   text-align: left;
-  font-size: 0.9rem;
-  transition: all 0.2s;
+  font-size: var(--font-size-sm);
+  transition: all var(--duration-150) var(--ease-out);
 }
 
 .nav-item:hover {
-  background: #2d2d44;
-  color: #fff;
+  background: var(--color-gray-800);
+  color: var(--color-white);
 }
 
 .nav-item.active {
-  background: #4a4ae8;
-  color: #fff;
+  background: var(--color-gray-800);
+  color: var(--color-white);
 }
 
 .nav-icon {
-  margin-right: 12px;
-  font-size: 1.1rem;
+  margin-right: var(--space-3);
+  font-size: var(--font-size-base);
 }
 
 .sidebar-footer {
-  padding: 16px 20px;
-  border-top: 1px solid #2d2d44;
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--color-gray-800);
 }
 
 .user-email {
   display: block;
-  font-size: 0.8rem;
-  color: #a0a0b8;
-  margin-bottom: 8px;
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-400);
+  margin-bottom: var(--space-2);
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .logout-btn {
   width: 100%;
-  padding: 8px;
-  background: #dc3545;
-  color: #fff;
+  padding: var(--space-2);
+  background: var(--color-danger);
+  color: var(--color-white);
   border: none;
-  border-radius: 4px;
+  border-radius: var(--border-radius);
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
 }
 
 .logout-btn:hover {
-  background: #c82333;
+  background: #dc2626;
 }
 
 .main-content {
   flex: 1;
-  padding: 24px;
+  padding: var(--space-6);
   overflow-y: auto;
-}
-
-/* Loading Screen */
-.loading-screen {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-  font-size: 1.2rem;
-  color: #666;
-}
-
-/* View Common Styles */
-.view-loading,
-.view-error {
-  padding: 40px;
-  text-align: center;
-  color: #666;
-}
-
-.view-error {
-  color: #dc3545;
+  background-color: var(--color-gray-950);
 }
 
 /* External Dashboard Variant */
 .dashboard-layout.external .sidebar {
-  background: #16213e;
+  background: var(--color-gray-900);
 }
 
 .dashboard-layout.external .nav-item.active {
-  background: #e84a9b;
+  background: #8b5cf6;
 }

@@ -1,0 +1,126 @@
+/**
+ * ConfidenceScore Styles
+ * Large numeric display with status-based coloring
+ */
+
+.confidence-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.confidence-score-value {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+}
+
+.confidence-score-number {
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.confidence-score-percent {
+  font-weight: var(--font-weight-medium);
+  opacity: 0.7;
+}
+
+.confidence-score-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-400);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.confidence-score-bar {
+  width: 100%;
+  height: 4px;
+  background-color: var(--color-gray-700);
+  border-radius: var(--border-radius-full);
+  overflow: hidden;
+}
+
+.confidence-score-fill {
+  height: 100%;
+  border-radius: var(--border-radius-full);
+  transition: width var(--duration-300) var(--ease-out);
+}
+
+/* Size variants */
+.confidence-score.size-sm .confidence-score-number {
+  font-size: var(--font-size-xl);
+}
+
+.confidence-score.size-sm .confidence-score-percent {
+  font-size: var(--font-size-sm);
+}
+
+.confidence-score.size-sm .confidence-score-bar {
+  max-width: 60px;
+}
+
+.confidence-score.size-md .confidence-score-number {
+  font-size: var(--font-size-3xl);
+}
+
+.confidence-score.size-md .confidence-score-percent {
+  font-size: var(--font-size-lg);
+}
+
+.confidence-score.size-md .confidence-score-bar {
+  max-width: 80px;
+}
+
+.confidence-score.size-lg .confidence-score-number {
+  font-size: var(--font-size-4xl);
+}
+
+.confidence-score.size-lg .confidence-score-percent {
+  font-size: var(--font-size-xl);
+}
+
+.confidence-score.size-lg .confidence-score-bar {
+  max-width: 100px;
+}
+
+.confidence-score.size-xl .confidence-score-number {
+  font-size: 4rem;
+}
+
+.confidence-score.size-xl .confidence-score-percent {
+  font-size: var(--font-size-2xl);
+}
+
+.confidence-score.size-xl .confidence-score-bar {
+  max-width: 120px;
+}
+
+/* Status colors */
+.confidence-score.status-pass .confidence-score-number,
+.confidence-score.status-pass .confidence-score-percent {
+  color: var(--color-success);
+}
+
+.confidence-score.status-pass .confidence-score-fill {
+  background-color: var(--color-success);
+}
+
+.confidence-score.status-pending .confidence-score-number,
+.confidence-score.status-pending .confidence-score-percent {
+  color: var(--color-warning);
+}
+
+.confidence-score.status-pending .confidence-score-fill {
+  background-color: var(--color-warning);
+}
+
+.confidence-score.status-fail .confidence-score-number,
+.confidence-score.status-fail .confidence-score-percent {
+  color: var(--color-danger);
+}
+
+.confidence-score.status-fail .confidence-score-fill {
+  background-color: var(--color-danger);
+}

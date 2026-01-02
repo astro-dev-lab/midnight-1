@@ -1,0 +1,17 @@
+/**
+ * DashboardLayout Styles - Three-zone container
+ */
+
+.dashboard-layout-container {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--color-gray-950, #0a0a0a);
+}
+
+/* Dark theme enforcement */
+.dashboard-layout-container,
+.dashboard-layout-container * {
+  color-scheme: dark;
+}

@@ -1,0 +1,145 @@
+/**
+ * VersionHistory Styles
+ * Immutable version list
+ */
+
+.version-history {
+  /* Container */
+  display: flex;
+  flex-direction: column;
+}
+
+.version-history.empty {
+  padding: var(--space-4);
+}
+
+.version-history-empty {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-500);
+  text-align: center;
+}
+
+.version-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Version Item */
+.version-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--border-radius);
+  transition: background-color var(--duration-150) var(--ease-out);
+}
+
+.version-item:hover {
+  background-color: var(--color-gray-800);
+}
+
+.version-item.current {
+  background-color: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.version-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.version-item-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.version-number {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-white);
+  font-variant-numeric: tabular-nums;
+}
+
+.version-current-badge {
+  padding: 2px var(--space-2);
+  background-color: var(--color-primary);
+  border-radius: var(--border-radius-sm);
+  color: var(--color-white);
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.version-label {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-300);
+}
+
+.version-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.version-author,
+.version-date,
+.version-size {
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-500);
+}
+
+.version-separator {
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-600);
+}
+
+/* Actions */
+.version-item-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity var(--duration-150) var(--ease-out);
+}
+
+.version-item:hover .version-item-actions {
+  opacity: 1;
+}
+
+.version-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--color-gray-700);
+  border-radius: var(--border-radius);
+  color: var(--color-gray-400);
+  cursor: pointer;
+  transition: 
+    background-color var(--duration-150) var(--ease-out),
+    border-color var(--duration-150) var(--ease-out),
+    color var(--duration-150) var(--ease-out);
+}
+
+.version-action:hover {
+  background-color: var(--color-gray-700);
+  border-color: var(--color-gray-600);
+  color: var(--color-white);
+}
+
+.version-action:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}

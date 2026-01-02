@@ -1,1093 +1,895 @@
-'use strict';
-
 /**
  * Version Lineage Tracker Tests
- * 
- * Comprehensive tests for version lineage tracking, delta calculation,
- * transformation inference, and health analysis.
  */
 
 const {
-  // Enums
-  VersionState,
-  Relationship,
-  DeltaSeverity,
-  TransformationType,
-  LineageHealth,
-  Confidence,
-  
-  // Constants
-  DELTA_THRESHOLDS,
-  TRANSFORMATION_PATTERNS,
-  STATUS_DESCRIPTIONS,
-  
-  // Core functions
-  buildLineageTree,
-  calculateDelta,
-  inferTransformation,
-  traceLineage,
-  getRelationship,
-  
-  // Analysis functions
-  analyzeLineageHealth,
-  findVersions,
-  compareBranches,
-  
-  // Quick check functions
+  analyze,
   quickCheck,
-  validateIntegrity,
-  
-  // Helpers
-  formatVersionInfo
+  calculateDelta,
+  classifyImpact,
+  buildLineage,
+  extractMetrics,
+  inferRelation,
+  calculateCumulativeImpact,
+  detectPatterns,
+  determineQualityTrend,
+  trackDSPOperations,
+  categorizeOperation,
+  estimateOperationImpact,
+  VersionRelation,
+  ImpactLevel,
+  QualityTrend,
+  DSPCategory,
+  THRESHOLDS
 } = require('../services/versionLineageTracker');
 
 // ============================================================================
-// Test Data Fixtures
+// Test Fixtures
 // ============================================================================
 
-const createVersion = (id, parentId = null, metrics = {}) => ({
-  id,
-  parentId,
-  metrics: {
-    integratedLufs: -14,
-    truePeakDbtp: -1,
-    loudnessRange: 8,
-    stereoWidth: 0.7,
-    spectralCentroid: 3000,
-    ...metrics
-  }
+const originalVersion = {
+  id: 'v1',
+  name: 'Original Mix',
+  versionNumber: 1,
+  createdAt: '2024-01-01T00:00:00Z',
+  integratedLoudness: -14,
+  truePeak: -1,
+  loudnessRange: 8,
+  crestFactor: 12,
+  sampleRate: 48000,
+  bitDepth: 24,
+  duration: 240
+};
+
+const masteredVersion = {
+  id: 'v2',
+  name: 'Mastered',
+  versionNumber: 2,
+  createdAt: '2024-01-15T00:00:00Z',
+  integratedLoudness: -10,
+  truePeak: -0.5,
+  loudnessRange: 6,
+  crestFactor: 10,
+  sampleRate: 48000,
+  bitDepth: 24,
+  duration: 240,
+  dspOperations: [
+    { name: 'Limiter', category: DSPCategory.DYNAMICS },
+    { name: 'EQ', category: DSPCategory.EQ }
+  ]
+};
+
+const remaster = {
+  id: 'v3',
+  name: 'Remaster 2024',
+  versionNumber: 3,
+  createdAt: '2024-06-01T00:00:00Z',
+  integratedLoudness: -12,
+  truePeak: -1,
+  loudnessRange: 7,
+  crestFactor: 11,
+  sampleRate: 48000,
+  bitDepth: 24,
+  duration: 240
+};
+
+const loudnessWarVersions = [
+  { integratedLoudness: -14, truePeak: -2, loudnessRange: 10 },
+  { integratedLoudness: -12, truePeak: -1.5, loudnessRange: 8 },
+  { integratedLoudness: -10, truePeak: -1, loudnessRange: 6 },
+  { integratedLoudness: -8, truePeak: -0.5, loudnessRange: 4 }
+];
+
+// ============================================================================
+// Constants Tests
+// ============================================================================
+
+describe('Version Lineage Tracker Constants', () => {
+  describe('VersionRelation', () => {
+    it('should have all relation types', () => {
+      expect(VersionRelation.ORIGINAL).toBe('ORIGINAL');
+      expect(VersionRelation.DERIVED).toBe('DERIVED');
+      expect(VersionRelation.REMASTER).toBe('REMASTER');
+      expect(VersionRelation.REMIX).toBe('REMIX');
+      expect(VersionRelation.ALTERNATE).toBe('ALTERNATE');
+      expect(VersionRelation.REVISION).toBe('REVISION');
+    });
+
+    it('should be frozen', () => {
+      expect(Object.isFrozen(VersionRelation)).toBe(true);
+    });
+  });
+
+  describe('ImpactLevel', () => {
+    it('should have all impact levels', () => {
+      expect(ImpactLevel.NONE).toBe('NONE');
+      expect(ImpactLevel.MINIMAL).toBe('MINIMAL');
+      expect(ImpactLevel.LOW).toBe('LOW');
+      expect(ImpactLevel.MODERATE).toBe('MODERATE');
+      expect(ImpactLevel.HIGH).toBe('HIGH');
+      expect(ImpactLevel.SEVERE).toBe('SEVERE');
+    });
+
+    it('should be frozen', () => {
+      expect(Object.isFrozen(ImpactLevel)).toBe(true);
+    });
+  });
+
+  describe('QualityTrend', () => {
+    it('should have all trend types', () => {
+      expect(QualityTrend.IMPROVING).toBe('IMPROVING');
+      expect(QualityTrend.STABLE).toBe('STABLE');
+      expect(QualityTrend.DEGRADING).toBe('DEGRADING');
+      expect(QualityTrend.FLUCTUATING).toBe('FLUCTUATING');
+    });
+  });
+
+  describe('DSPCategory', () => {
+    it('should have all DSP categories', () => {
+      expect(DSPCategory.DYNAMICS).toBe('DYNAMICS');
+      expect(DSPCategory.EQ).toBe('EQ');
+      expect(DSPCategory.LOUDNESS).toBe('LOUDNESS');
+      expect(DSPCategory.SPATIAL).toBe('SPATIAL');
+      expect(DSPCategory.TIME).toBe('TIME');
+      expect(DSPCategory.DISTORTION).toBe('DISTORTION');
+      expect(DSPCategory.RESTORATION).toBe('RESTORATION');
+    });
+  });
+
+  describe('THRESHOLDS', () => {
+    it('should have loudness thresholds', () => {
+      expect(THRESHOLDS.LOUDNESS_CHANGE_MINIMAL).toBeDefined();
+      expect(THRESHOLDS.LOUDNESS_CHANGE_SIGNIFICANT).toBeDefined();
+    });
+
+    it('should have cumulative thresholds', () => {
+      expect(THRESHOLDS.CUMULATIVE_LOUDNESS_WARNING).toBeDefined();
+      expect(THRESHOLDS.CUMULATIVE_PEAK_WARNING).toBeDefined();
+    });
+
+    it('should have generation thresholds', () => {
+      expect(THRESHOLDS.MAX_RECOMMENDED_VERSIONS).toBeDefined();
+      expect(THRESHOLDS.GENERATION_LOSS_THRESHOLD).toBeDefined();
+    });
+
+    it('should be frozen', () => {
+      expect(Object.isFrozen(THRESHOLDS)).toBe(true);
+    });
+  });
 });
 
-const createLinearLineage = () => [
-  createVersion('v1', null, { integratedLufs: -20, loudnessRange: 12 }),
-  createVersion('v2', 'v1', { integratedLufs: -18, loudnessRange: 10 }),
-  createVersion('v3', 'v2', { integratedLufs: -16, loudnessRange: 8 }),
-  createVersion('v4', 'v3', { integratedLufs: -14, loudnessRange: 7 })
-];
-
-const createBranchedLineage = () => [
-  createVersion('root', null, { integratedLufs: -20 }),
-  createVersion('a1', 'root', { integratedLufs: -18 }),
-  createVersion('a2', 'a1', { integratedLufs: -16 }),
-  createVersion('b1', 'root', { integratedLufs: -19 }),
-  createVersion('b2', 'b1', { integratedLufs: -14 })
-];
-
 // ============================================================================
-// Enum Tests
+// Delta Calculation Tests
 // ============================================================================
 
-describe('Version Lineage Tracker', () => {
-  describe('Constants', () => {
-    describe('VersionState', () => {
-      it('should have all state types defined', () => {
-        expect(VersionState.RAW).toBe('RAW');
-        expect(VersionState.DERIVED).toBe('DERIVED');
-        expect(VersionState.FINAL).toBe('FINAL');
-      });
+describe('calculateDelta', () => {
+  it('should calculate loudness delta', () => {
+    const result = calculateDelta(originalVersion, masteredVersion);
+    
+    expect(result.deltas.integratedLoudness).toBe(4); // -10 - (-14)
+  });
 
-      it('should be frozen', () => {
-        expect(Object.isFrozen(VersionState)).toBe(true);
-      });
+  it('should calculate peak delta', () => {
+    const result = calculateDelta(originalVersion, masteredVersion);
+    
+    expect(result.deltas.truePeak).toBe(0.5); // -0.5 - (-1)
+  });
 
-      it('should have 3 states', () => {
-        expect(Object.keys(VersionState)).toHaveLength(3);
-      });
+  it('should calculate loudness range delta', () => {
+    const result = calculateDelta(originalVersion, masteredVersion);
+    
+    expect(result.deltas.loudnessRange).toBe(-2); // 6 - 8
+  });
+
+  it('should track significant changes', () => {
+    const result = calculateDelta(originalVersion, masteredVersion);
+    
+    expect(result.changes.length).toBeGreaterThan(0);
+    expect(result.hasSignificantChanges).toBe(true);
+  });
+
+  it('should classify impact level', () => {
+    const result = calculateDelta(originalVersion, masteredVersion);
+    
+    expect([ImpactLevel.MODERATE, ImpactLevel.HIGH]).toContain(result.impactLevel);
+  });
+
+  it('should detect sample rate changes', () => {
+    const downsampled = { ...originalVersion, sampleRate: 44100 };
+    const result = calculateDelta(originalVersion, downsampled);
+    
+    expect(result.deltas.sampleRate).toBeDefined();
+    expect(result.deltas.sampleRate.direction).toBe('DOWNSAMPLED');
+  });
+
+  it('should detect bit depth changes', () => {
+    const reduced = { ...originalVersion, bitDepth: 16 };
+    const result = calculateDelta(originalVersion, reduced);
+    
+    expect(result.deltas.bitDepth).toBeDefined();
+    expect(result.deltas.bitDepth.direction).toBe('DECREASED');
+  });
+
+  it('should detect duration changes', () => {
+    const extended = { ...originalVersion, duration: 300 };
+    const result = calculateDelta(originalVersion, extended);
+    
+    expect(result.deltas.duration).toBe(60);
+  });
+
+  it('should generate warnings for concerning changes', () => {
+    const hotMaster = { ...originalVersion, truePeak: -0.3 };
+    const result = calculateDelta(originalVersion, hotMaster);
+    
+    expect(result.warnings.length).toBeGreaterThan(0);
+  });
+
+  it('should handle missing versions', () => {
+    expect(calculateDelta(null, originalVersion).error).toBeDefined();
+    expect(calculateDelta(originalVersion, null).error).toBeDefined();
+  });
+
+  it('should handle minimal changes', () => {
+    const tiny = { ...originalVersion, integratedLoudness: -13.7 }; // 0.3 dB change
+    const result = calculateDelta(originalVersion, tiny);
+    
+    expect(result.impactLevel).toBe(ImpactLevel.MINIMAL);
+  });
+});
+
+describe('classifyImpact', () => {
+  it('should classify none for < 0.1', () => {
+    expect(classifyImpact(0.05)).toBe(ImpactLevel.NONE);
+  });
+
+  it('should classify minimal for 0.1-0.5', () => {
+    expect(classifyImpact(0.3)).toBe(ImpactLevel.MINIMAL);
+  });
+
+  it('should classify low for 0.5-1.5', () => {
+    expect(classifyImpact(1)).toBe(ImpactLevel.LOW);
+  });
+
+  it('should classify moderate for 1.5-3', () => {
+    expect(classifyImpact(2)).toBe(ImpactLevel.MODERATE);
+  });
+
+  it('should classify high for 3-6', () => {
+    expect(classifyImpact(5)).toBe(ImpactLevel.HIGH);
+  });
+
+  it('should classify severe for > 6', () => {
+    expect(classifyImpact(8)).toBe(ImpactLevel.SEVERE);
+  });
+});
+
+// ============================================================================
+// Lineage Building Tests
+// ============================================================================
+
+describe('buildLineage', () => {
+  it('should build lineage from version array', () => {
+    const versions = [originalVersion, masteredVersion, remaster];
+    const result = buildLineage(versions);
+    
+    expect(result.versions).toHaveLength(3);
+    expect(result.edges).toHaveLength(2);
+    expect(result.root).toBe('v1');
+  });
+
+  it('should assign generation numbers', () => {
+    const versions = [originalVersion, masteredVersion];
+    const result = buildLineage(versions);
+    
+    expect(result.versions[0].generation).toBe(1);
+    expect(result.versions[1].generation).toBe(2);
+  });
+
+  it('should mark first version as ORIGINAL', () => {
+    const versions = [originalVersion, masteredVersion];
+    const result = buildLineage(versions);
+    
+    expect(result.versions[0].relation).toBe(VersionRelation.ORIGINAL);
+  });
+
+  it('should infer relation types', () => {
+    const versions = [originalVersion, remaster];
+    const result = buildLineage(versions);
+    
+    expect(result.versions[1].relation).toBe(VersionRelation.REMASTER);
+  });
+
+  it('should calculate deltas for edges', () => {
+    const versions = [originalVersion, masteredVersion];
+    const result = buildLineage(versions);
+    
+    expect(result.edges[0].delta).toBeDefined();
+    expect(result.edges[0].delta.deltas).toBeDefined();
+  });
+
+  it('should sort by creation date', () => {
+    const unsorted = [masteredVersion, originalVersion];
+    const result = buildLineage(unsorted);
+    
+    expect(result.versions[0].name).toBe('Original Mix');
+    expect(result.versions[1].name).toBe('Mastered');
+  });
+
+  it('should handle empty array', () => {
+    expect(buildLineage([]).error).toBeDefined();
+  });
+
+  it('should handle single version', () => {
+    const result = buildLineage([originalVersion]);
+    
+    expect(result.versions).toHaveLength(1);
+    expect(result.edges).toHaveLength(0);
+  });
+});
+
+describe('extractMetrics', () => {
+  it('should extract standard metrics', () => {
+    const metrics = extractMetrics(originalVersion);
+    
+    expect(metrics.integratedLoudness).toBe(-14);
+    expect(metrics.truePeak).toBe(-1);
+    expect(metrics.loudnessRange).toBe(8);
+  });
+
+  it('should handle alternative property names', () => {
+    const altVersion = {
+      integrated: -14,
+      truePeakDbfs: -1,
+      lra: 8
+    };
+    
+    const metrics = extractMetrics(altVersion);
+    
+    expect(metrics.integratedLoudness).toBe(-14);
+    expect(metrics.truePeak).toBe(-1);
+    expect(metrics.loudnessRange).toBe(8);
+  });
+});
+
+describe('inferRelation', () => {
+  it('should detect remaster', () => {
+    const child = { name: 'Remaster 2024' };
+    expect(inferRelation(originalVersion, child)).toBe(VersionRelation.REMASTER);
+  });
+
+  it('should detect remix', () => {
+    const child = { name: 'Club Remix' };
+    expect(inferRelation(originalVersion, child)).toBe(VersionRelation.REMIX);
+  });
+
+  it('should detect alternate', () => {
+    const child = { name: 'Alternate Take' };
+    expect(inferRelation(originalVersion, child)).toBe(VersionRelation.ALTERNATE);
+  });
+
+  it('should detect revision', () => {
+    const child = { name: 'Fix v2' };
+    expect(inferRelation(originalVersion, child)).toBe(VersionRelation.REVISION);
+  });
+
+  it('should infer remix from duration change', () => {
+    const child = { name: 'Version 2', duration: 360 }; // 2 min longer
+    expect(inferRelation(originalVersion, child)).toBe(VersionRelation.REMIX);
+  });
+
+  it('should default to DERIVED', () => {
+    const child = { name: 'Version 2' };
+    expect(inferRelation(originalVersion, child)).toBe(VersionRelation.DERIVED);
+  });
+});
+
+// ============================================================================
+// Cumulative Impact Tests
+// ============================================================================
+
+describe('calculateCumulativeImpact', () => {
+  it('should calculate total generations', () => {
+    const lineage = buildLineage([originalVersion, masteredVersion, remaster]);
+    const result = calculateCumulativeImpact(lineage);
+    
+    expect(result.generations).toBe(3);
+  });
+
+  it('should calculate cumulative deltas', () => {
+    const lineage = buildLineage([originalVersion, masteredVersion]);
+    const result = calculateCumulativeImpact(lineage);
+    
+    expect(result.cumulativeDeltas.loudness).toBeGreaterThan(0);
+  });
+
+  it('should calculate per-generation loss', () => {
+    const lineage = buildLineage([originalVersion, masteredVersion, remaster]);
+    const result = calculateCumulativeImpact(lineage);
+    
+    expect(result.perGenerationLoss).toBeDefined();
+    expect(typeof result.perGenerationLoss).toBe('number');
+  });
+
+  it('should generate warnings for excessive change', () => {
+    const lineage = buildLineage(loudnessWarVersions.map((v, i) => ({
+      ...v,
+      id: `v${i + 1}`,
+      createdAt: new Date(Date.now() + i * 86400000).toISOString()
+    })));
+    
+    const result = calculateCumulativeImpact(lineage);
+    
+    expect(result.warnings.length).toBeGreaterThan(0);
+  });
+
+  it('should warn on excessive generations', () => {
+    const manyVersions = Array(7).fill(null).map((_, i) => ({
+      ...originalVersion,
+      id: `v${i + 1}`,
+      integratedLoudness: -14 + i * 0.5,
+      createdAt: new Date(Date.now() + i * 86400000).toISOString()
+    }));
+    
+    const lineage = buildLineage(manyVersions);
+    const result = calculateCumulativeImpact(lineage);
+    
+    expect(result.warnings.some(w => w.type === 'EXCESSIVE_GENERATIONS')).toBe(true);
+  });
+
+  it('should handle single version', () => {
+    const lineage = buildLineage([originalVersion]);
+    const result = calculateCumulativeImpact(lineage);
+    
+    expect(result.generations).toBe(1);
+    expect(result.totalImpact).toBe(0);
+  });
+});
+
+// ============================================================================
+// Pattern Detection Tests
+// ============================================================================
+
+describe('detectPatterns', () => {
+  it('should detect loudness escalation', () => {
+    const lineage = buildLineage(loudnessWarVersions.map((v, i) => ({
+      ...v,
+      id: `v${i + 1}`,
+      createdAt: new Date(Date.now() + i * 86400000).toISOString()
+    })));
+    
+    const result = detectPatterns(lineage);
+    
+    expect(result.patterns.some(p => p.type === 'LOUDNESS_ESCALATION')).toBe(true);
+  });
+
+  it('should detect dynamic compression pattern', () => {
+    const compressingVersions = [
+      { loudnessRange: 12 },
+      { loudnessRange: 9 },
+      { loudnessRange: 6 }
+    ].map((v, i) => ({
+      ...v,
+      id: `v${i + 1}`,
+      integratedLoudness: -14,
+      createdAt: new Date(Date.now() + i * 86400000).toISOString()
+    }));
+    
+    const lineage = buildLineage(compressingVersions);
+    const result = detectPatterns(lineage);
+    
+    expect(result.patterns.some(p => p.type === 'DYNAMIC_COMPRESSION')).toBe(true);
+  });
+
+  it('should detect oscillating changes', () => {
+    const oscillating = [
+      { integratedLoudness: -14 },
+      { integratedLoudness: -12 },
+      { integratedLoudness: -15 },
+      { integratedLoudness: -11 }
+    ].map((v, i) => ({
+      ...v,
+      id: `v${i + 1}`,
+      createdAt: new Date(Date.now() + i * 86400000).toISOString()
+    }));
+    
+    const lineage = buildLineage(oscillating);
+    const result = detectPatterns(lineage);
+    
+    expect(result.patterns.some(p => p.type === 'OSCILLATING_CHANGES')).toBe(true);
+  });
+
+  it('should detect sample rate degradation', () => {
+    const degrading = [
+      { sampleRate: 96000 },
+      { sampleRate: 48000 },
+      { sampleRate: 44100 }
+    ].map((v, i) => ({
+      ...v,
+      id: `v${i + 1}`,
+      integratedLoudness: -14,
+      createdAt: new Date(Date.now() + i * 86400000).toISOString()
+    }));
+    
+    const lineage = buildLineage(degrading);
+    const result = detectPatterns(lineage);
+    
+    expect(result.patterns.some(p => p.type === 'SAMPLE_RATE_DEGRADATION')).toBe(true);
+  });
+
+  it('should identify quality trend', () => {
+    const lineage = buildLineage([originalVersion, masteredVersion]);
+    const result = detectPatterns(lineage);
+    
+    expect(Object.values(QualityTrend)).toContain(result.trend);
+  });
+
+  it('should handle single version', () => {
+    const lineage = buildLineage([originalVersion]);
+    const result = detectPatterns(lineage);
+    
+    expect(result.patterns).toHaveLength(0);
+    expect(result.trend).toBe(QualityTrend.STABLE);
+  });
+});
+
+describe('determineQualityTrend', () => {
+  it('should return FLUCTUATING for oscillating patterns', () => {
+    const patterns = [{ type: 'OSCILLATING_CHANGES', severity: 'WARNING' }];
+    expect(determineQualityTrend({}, patterns)).toBe(QualityTrend.FLUCTUATING);
+  });
+
+  it('should return DEGRADING for warning patterns', () => {
+    const patterns = [{ type: 'LOUDNESS_ESCALATION', severity: 'WARNING' }];
+    expect(determineQualityTrend({}, patterns)).toBe(QualityTrend.DEGRADING);
+  });
+
+  it('should return IMPROVING for loudness reduction', () => {
+    const patterns = [{ type: 'LOUDNESS_REDUCTION', severity: 'INFO' }];
+    expect(determineQualityTrend({}, patterns)).toBe(QualityTrend.IMPROVING);
+  });
+
+  it('should return STABLE for no patterns', () => {
+    expect(determineQualityTrend({}, [])).toBe(QualityTrend.STABLE);
+  });
+});
+
+// ============================================================================
+// DSP Operation Tests
+// ============================================================================
+
+describe('trackDSPOperations', () => {
+  it('should track operations', () => {
+    const result = trackDSPOperations(originalVersion, masteredVersion);
+    
+    expect(result.operations).toHaveLength(2);
+    expect(result.operationCount).toBe(2);
+  });
+
+  it('should categorize operations', () => {
+    const result = trackDSPOperations(originalVersion, masteredVersion);
+    
+    expect(result.categories[DSPCategory.DYNAMICS]).toBeDefined();
+    expect(result.categories[DSPCategory.EQ]).toBeDefined();
+  });
+
+  it('should estimate impact', () => {
+    const result = trackDSPOperations(originalVersion, masteredVersion);
+    
+    expect(Object.values(ImpactLevel)).toContain(result.estimatedImpact);
+  });
+
+  it('should handle no operations', () => {
+    const result = trackDSPOperations(originalVersion, remaster);
+    
+    expect(result.operations).toHaveLength(0);
+    expect(result.estimatedImpact).toBe(ImpactLevel.NONE);
+  });
+});
+
+describe('categorizeOperation', () => {
+  it('should categorize dynamics processors', () => {
+    expect(categorizeOperation('Compressor')).toBe(DSPCategory.DYNAMICS);
+    expect(categorizeOperation('Limiter')).toBe(DSPCategory.DYNAMICS);
+    expect(categorizeOperation('Gate')).toBe(DSPCategory.DYNAMICS);
+  });
+
+  it('should categorize EQ', () => {
+    expect(categorizeOperation('Parametric EQ')).toBe(DSPCategory.EQ);
+    expect(categorizeOperation('High Pass Filter')).toBe(DSPCategory.EQ);
+    expect(categorizeOperation('Low Shelf')).toBe(DSPCategory.EQ);
+  });
+
+  it('should categorize loudness', () => {
+    expect(categorizeOperation('Gain')).toBe(DSPCategory.LOUDNESS);
+    expect(categorizeOperation('Normalize')).toBe(DSPCategory.LOUDNESS);
+    expect(categorizeOperation('LUFS Match')).toBe(DSPCategory.LOUDNESS);
+  });
+
+  it('should categorize spatial', () => {
+    expect(categorizeOperation('Stereo Width')).toBe(DSPCategory.SPATIAL);
+    expect(categorizeOperation('Pan')).toBe(DSPCategory.SPATIAL);
+    expect(categorizeOperation('Mid-Side')).toBe(DSPCategory.SPATIAL);
+  });
+
+  it('should categorize time-based', () => {
+    expect(categorizeOperation('Reverb')).toBe(DSPCategory.TIME);
+    expect(categorizeOperation('Delay')).toBe(DSPCategory.TIME);
+  });
+
+  it('should categorize distortion', () => {
+    expect(categorizeOperation('Saturation')).toBe(DSPCategory.DISTORTION);
+    expect(categorizeOperation('Tape Emulation')).toBe(DSPCategory.DISTORTION);
+  });
+
+  it('should categorize restoration', () => {
+    expect(categorizeOperation('DeNoise')).toBe(DSPCategory.RESTORATION);
+    expect(categorizeOperation('DeClick')).toBe(DSPCategory.RESTORATION);
+  });
+
+  it('should default to OTHER', () => {
+    expect(categorizeOperation('Unknown Plugin')).toBe(DSPCategory.OTHER);
+  });
+});
+
+describe('estimateOperationImpact', () => {
+  it('should estimate higher impact for loudness operations', () => {
+    const loudness = estimateOperationImpact({ name: 'Normalize' });
+    const spatial = estimateOperationImpact({ name: 'Stereo Width' });
+    
+    expect(loudness).toBeGreaterThan(spatial);
+  });
+
+  it('should use category if provided', () => {
+    const impact = estimateOperationImpact({ 
+      name: 'Custom',
+      category: DSPCategory.DYNAMICS 
     });
+    
+    expect(impact).toBe(1.5);
+  });
+});
 
-    describe('Relationship', () => {
-      it('should have all relationship types defined', () => {
-        expect(Relationship.PARENT).toBe('PARENT');
-        expect(Relationship.CHILD).toBe('CHILD');
-        expect(Relationship.SIBLING).toBe('SIBLING');
-        expect(Relationship.ANCESTOR).toBe('ANCESTOR');
-        expect(Relationship.DESCENDANT).toBe('DESCENDANT');
-        expect(Relationship.UNRELATED).toBe('UNRELATED');
-      });
+// ============================================================================
+// Quick Check Tests
+// ============================================================================
 
-      it('should be frozen', () => {
-        expect(Object.isFrozen(Relationship)).toBe(true);
-      });
+describe('quickCheck', () => {
+  it('should return generation count', () => {
+    const result = quickCheck([originalVersion, masteredVersion]);
+    
+    expect(result.generations).toBe(2);
+  });
 
-      it('should have 6 relationship types', () => {
-        expect(Object.keys(Relationship)).toHaveLength(6);
-      });
-    });
+  it('should return impact level', () => {
+    const result = quickCheck([originalVersion, masteredVersion]);
+    
+    expect(result.impactLevel).toBeDefined();
+    expect(Object.values(ImpactLevel)).toContain(result.impactLevel);
+  });
 
-    describe('DeltaSeverity', () => {
-      it('should have all severity levels defined', () => {
-        expect(DeltaSeverity.NONE).toBe('NONE');
-        expect(DeltaSeverity.MINOR).toBe('MINOR');
-        expect(DeltaSeverity.MODERATE).toBe('MODERATE');
-        expect(DeltaSeverity.MAJOR).toBe('MAJOR');
-        expect(DeltaSeverity.CRITICAL).toBe('CRITICAL');
-      });
+  it('should return trend', () => {
+    const result = quickCheck([originalVersion, masteredVersion]);
+    
+    expect(Object.values(QualityTrend)).toContain(result.trend);
+  });
 
-      it('should be frozen', () => {
-        expect(Object.isFrozen(DeltaSeverity)).toBe(true);
-      });
+  it('should count warnings', () => {
+    const result = quickCheck(loudnessWarVersions.map((v, i) => ({
+      ...v,
+      id: `v${i + 1}`,
+      createdAt: new Date(Date.now() + i * 86400000).toISOString()
+    })));
+    
+    expect(result.hasWarnings).toBe(true);
+    expect(result.warningCount).toBeGreaterThan(0);
+  });
 
-      it('should have 5 severity levels', () => {
-        expect(Object.keys(DeltaSeverity)).toHaveLength(5);
-      });
-    });
+  it('should handle errors', () => {
+    expect(quickCheck([]).error).toBeDefined();
+  });
+});
 
-    describe('TransformationType', () => {
-      it('should have all transformation types defined', () => {
-        expect(TransformationType.LEVEL_CHANGE).toBe('LEVEL_CHANGE');
-        expect(TransformationType.DYNAMICS).toBe('DYNAMICS');
-        expect(TransformationType.EQ).toBe('EQ');
-        expect(TransformationType.REVERB).toBe('REVERB');
-        expect(TransformationType.STEREO).toBe('STEREO');
-        expect(TransformationType.FORMAT).toBe('FORMAT');
-        expect(TransformationType.RESTORATION).toBe('RESTORATION');
-        expect(TransformationType.MIXED).toBe('MIXED');
-        expect(TransformationType.UNKNOWN).toBe('UNKNOWN');
-      });
+// ============================================================================
+// Full Analysis Tests
+// ============================================================================
 
-      it('should be frozen', () => {
-        expect(Object.isFrozen(TransformationType)).toBe(true);
-      });
-    });
+describe('analyze', () => {
+  it('should include lineage', () => {
+    const result = analyze([originalVersion, masteredVersion]);
+    
+    expect(result.lineage).toBeDefined();
+    expect(result.lineage.versions).toHaveLength(2);
+  });
 
-    describe('LineageHealth', () => {
-      it('should have all health statuses defined', () => {
-        expect(LineageHealth.HEALTHY).toBe('HEALTHY');
-        expect(LineageHealth.DEGRADED).toBe('DEGRADED');
-        expect(LineageHealth.CONCERNING).toBe('CONCERNING');
-        expect(LineageHealth.CRITICAL).toBe('CRITICAL');
-        expect(LineageHealth.UNKNOWN).toBe('UNKNOWN');
-      });
+  it('should include version summary', () => {
+    const result = analyze([originalVersion, masteredVersion]);
+    
+    expect(result.versionSummary).toBeDefined();
+    expect(result.versionSummary).toHaveLength(2);
+  });
 
-      it('should be frozen', () => {
-        expect(Object.isFrozen(LineageHealth)).toBe(true);
-      });
-    });
+  it('should include cumulative impact', () => {
+    const result = analyze([originalVersion, masteredVersion]);
+    
+    expect(result.cumulativeImpact).toBeDefined();
+    expect(result.cumulativeImpact.generations).toBe(2);
+  });
 
-    describe('DELTA_THRESHOLDS', () => {
-      it('should have thresholds for key metrics', () => {
-        expect(DELTA_THRESHOLDS.lufs).toBeDefined();
-        expect(DELTA_THRESHOLDS.truePeak).toBeDefined();
-        expect(DELTA_THRESHOLDS.dynamicRange).toBeDefined();
-        expect(DELTA_THRESHOLDS.stereoWidth).toBeDefined();
-      });
+  it('should include patterns', () => {
+    const result = analyze([originalVersion, masteredVersion]);
+    
+    expect(result.patterns).toBeDefined();
+    expect(result.trend).toBeDefined();
+  });
 
-      it('should have increasing threshold levels', () => {
-        const lufs = DELTA_THRESHOLDS.lufs;
-        expect(lufs.minor).toBeLessThan(lufs.moderate);
-        expect(lufs.moderate).toBeLessThan(lufs.major);
-        expect(lufs.major).toBeLessThan(lufs.critical);
-      });
+  it('should generate recommendations', () => {
+    const result = analyze(loudnessWarVersions.map((v, i) => ({
+      ...v,
+      id: `v${i + 1}`,
+      createdAt: new Date(Date.now() + i * 86400000).toISOString()
+    })));
+    
+    expect(result.recommendations.length).toBeGreaterThan(0);
+  });
 
-      it('should be frozen', () => {
-        expect(Object.isFrozen(DELTA_THRESHOLDS)).toBe(true);
-      });
-    });
+  it('should include summary', () => {
+    const result = analyze([originalVersion, masteredVersion]);
+    
+    expect(result.summary).toBeDefined();
+    expect(result.summary.generations).toBe(2);
+    expect(result.summary.totalImpact).toBeDefined();
+    expect(result.summary.trend).toBeDefined();
+  });
 
-    describe('TRANSFORMATION_PATTERNS', () => {
-      it('should have patterns for each transformation type', () => {
-        expect(TRANSFORMATION_PATTERNS[TransformationType.LEVEL_CHANGE]).toBeDefined();
-        expect(TRANSFORMATION_PATTERNS[TransformationType.DYNAMICS]).toBeDefined();
-        expect(TRANSFORMATION_PATTERNS[TransformationType.EQ]).toBeDefined();
-      });
+  it('should include timestamp', () => {
+    const result = analyze([originalVersion, masteredVersion]);
+    
+    expect(result.analyzedAt).toBeDefined();
+    expect(new Date(result.analyzedAt)).toBeInstanceOf(Date);
+  });
 
-      it('should include expected and preserved metrics', () => {
-        const levelChange = TRANSFORMATION_PATTERNS[TransformationType.LEVEL_CHANGE];
-        expect(levelChange.expectedMetrics).toBeDefined();
-        expect(levelChange.preservedMetrics).toBeDefined();
-        expect(levelChange.description).toBeDefined();
-      });
+  it('should handle errors', () => {
+    expect(analyze([]).error).toBeDefined();
+  });
+});
 
-      it('should be frozen', () => {
-        expect(Object.isFrozen(TRANSFORMATION_PATTERNS)).toBe(true);
-      });
-    });
+// ============================================================================
+// Integration Scenarios
+// ============================================================================
 
-    describe('STATUS_DESCRIPTIONS', () => {
-      it('should have descriptions for all health levels', () => {
-        expect(STATUS_DESCRIPTIONS[LineageHealth.HEALTHY]).toBeDefined();
-        expect(STATUS_DESCRIPTIONS[LineageHealth.DEGRADED]).toBeDefined();
-        expect(STATUS_DESCRIPTIONS[LineageHealth.CONCERNING]).toBeDefined();
-        expect(STATUS_DESCRIPTIONS[LineageHealth.CRITICAL]).toBeDefined();
-      });
-
-      it('should be frozen', () => {
-        expect(Object.isFrozen(STATUS_DESCRIPTIONS)).toBe(true);
-      });
+describe('Integration Scenarios', () => {
+  describe('Standard Mastering Workflow', () => {
+    it('should track from mix to master', () => {
+      const versions = [
+        { ...originalVersion, name: 'Mix' },
+        { ...masteredVersion, name: 'Master' }
+      ];
+      
+      const result = analyze(versions);
+      
+      expect(result.versionCount).toBe(2);
+      expect(result.cumulativeImpact.impactLevel).not.toBe(ImpactLevel.SEVERE);
     });
   });
 
-  // ============================================================================
-  // Core Function Tests
-  // ============================================================================
-
-  describe('Core Functions', () => {
-    describe('buildLineageTree', () => {
-      it('should build tree from linear lineage', () => {
-        const versions = createLinearLineage();
-        const result = buildLineageTree(versions);
-
-        expect(result.success).toBe(true);
-        expect(result.tree).toBeDefined();
-        expect(result.tree.totalVersions).toBe(4);
-      });
-
-      it('should identify root nodes', () => {
-        const versions = createLinearLineage();
-        const result = buildLineageTree(versions);
-
-        expect(result.tree.roots).toHaveLength(1);
-        expect(result.tree.roots[0].id).toBe('v1');
-      });
-
-      it('should calculate correct depth', () => {
-        const versions = createLinearLineage();
-        const result = buildLineageTree(versions);
-
-        expect(result.tree.maxDepth).toBe(3);
-      });
-
-      it('should handle branched lineage', () => {
-        const versions = createBranchedLineage();
-        const result = buildLineageTree(versions);
-
-        expect(result.success).toBe(true);
-        expect(result.tree.roots).toHaveLength(1);
-      });
-
-      it('should mark leaf nodes as FINAL', () => {
-        const versions = createLinearLineage();
-        const result = buildLineageTree(versions);
-
-        const leafNode = result.tree.nodeMap.get('v4');
-        expect(leafNode.state).toBe(VersionState.FINAL);
-      });
-
-      it('should mark root as RAW', () => {
-        const versions = createLinearLineage();
-        const result = buildLineageTree(versions);
-
-        const rootNode = result.tree.nodeMap.get('v1');
-        expect(rootNode.state).toBe(VersionState.RAW);
-      });
-
-      it('should handle empty array', () => {
-        const result = buildLineageTree([]);
-        expect(result.success).toBe(false);
-        expect(result.error).toBeDefined();
-      });
-
-      it('should handle multiple roots', () => {
-        const versions = [
-          createVersion('a1', null),
-          createVersion('a2', 'a1'),
-          createVersion('b1', null),
-          createVersion('b2', 'b1')
-        ];
-        const result = buildLineageTree(versions);
-
-        expect(result.success).toBe(true);
-        expect(result.tree.roots).toHaveLength(2);
-        expect(result.tree.branchCount).toBe(2);
-      });
-    });
-
-    describe('calculateDelta', () => {
-      it('should calculate delta between versions', () => {
-        const v1 = createVersion('v1', null, { integratedLufs: -14 });
-        const v2 = createVersion('v2', 'v1', { integratedLufs: -12 });
-
-        const result = calculateDelta(v1, v2);
-
-        expect(result.success).toBe(true);
-        expect(result.deltas.lufs).toBeDefined();
-        expect(result.deltas.lufs.delta).toBe(2);
-      });
-
-      it('should classify delta severity', () => {
-        const v1 = createVersion('v1', null, { integratedLufs: -20 });
-        const v2 = createVersion('v2', 'v1', { integratedLufs: -8 });
-
-        const result = calculateDelta(v1, v2);
-
-        expect(result.deltas.lufs.severity).toBe(DeltaSeverity.CRITICAL);
-      });
-
-      it('should calculate overall severity', () => {
-        const v1 = createVersion('v1', null);
-        const v2 = createVersion('v2', 'v1');
-
-        const result = calculateDelta(v1, v2);
-
-        expect(result.overallSeverity).toBeDefined();
-      });
-
-      it('should include summary', () => {
-        const v1 = createVersion('v1', null, { integratedLufs: -14 });
-        const v2 = createVersion('v2', 'v1', { integratedLufs: -10 });
-
-        const result = calculateDelta(v1, v2);
-
-        expect(result.summary).toBeDefined();
-        expect(result.summary.length).toBeGreaterThan(0);
-      });
-
-      it('should handle missing metrics gracefully', () => {
-        const v1 = { id: 'v1', metrics: null };
-        const v2 = createVersion('v2', 'v1');
-
-        const result = calculateDelta(v1, v2);
-
-        expect(result.success).toBe(false);
-      });
-
-      it('should calculate percent change', () => {
-        const v1 = createVersion('v1', null, { integratedLufs: -20 });
-        const v2 = createVersion('v2', 'v1', { integratedLufs: -10 });
-
-        const result = calculateDelta(v1, v2);
-
-        expect(result.deltas.lufs.percentChange).toBeDefined();
-      });
-
-      it('should mark unchanged metrics as NONE severity', () => {
-        const v1 = createVersion('v1', null);
-        const v2 = createVersion('v2', 'v1');  // Same metrics
-
-        const result = calculateDelta(v1, v2);
-
-        expect(result.deltas.lufs.severity).toBe(DeltaSeverity.NONE);
-      });
-    });
-
-    describe('inferTransformation', () => {
-      it('should infer level change transformation', () => {
-        const v1 = createVersion('v1', null, { 
-          integratedLufs: -20, 
-          truePeakDbtp: -6,
-          loudnessRange: 8,
-          stereoWidth: 0.7,
-          spectralCentroid: 3000
-        });
-        const v2 = createVersion('v2', 'v1', { 
-          integratedLufs: -14,  // +6 dB
-          truePeakDbtp: 0,       // +6 dB (parallel change)
-          loudnessRange: 8,     // Preserved
-          stereoWidth: 0.7,     // Preserved
-          spectralCentroid: 3000 // Preserved
-        });
-
-        const delta = calculateDelta(v1, v2);
-        const result = inferTransformation(delta);
-
-        expect(result.success).toBe(true);
-        // Should infer level change or at minimum identify lufs/truePeak as changed
-        expect(result.changedMetrics).toContain('lufs');
-        expect(result.changedMetrics).toContain('truePeak');
-        expect(result.preservedMetrics).toContain('dynamicRange');
-      });
-
-      it('should infer dynamics processing', () => {
-        const v1 = createVersion('v1', null, { 
-          integratedLufs: -18,
-          loudnessRange: 12,
-          stereoWidth: 0.7
-        });
-        const v2 = createVersion('v2', 'v1', { 
-          integratedLufs: -14,
-          loudnessRange: 6,  // Significantly changed
-          stereoWidth: 0.7  // Preserved
-        });
-
-        const delta = calculateDelta(v1, v2);
-        const result = inferTransformation(delta);
-
-        expect(result.success).toBe(true);
-        expect(result.changedMetrics).toContain('dynamicRange');
-      });
-
-      it('should include confidence level', () => {
-        const v1 = createVersion('v1', null);
-        const v2 = createVersion('v2', 'v1', { integratedLufs: -10 });
-
-        const delta = calculateDelta(v1, v2);
-        const result = inferTransformation(delta);
-
-        expect(result.confidence).toBeDefined();
-        expect(Object.values(Confidence)).toContain(result.confidence);
-      });
-
-      it('should identify mixed transformations', () => {
-        const v1 = createVersion('v1', null, { 
-          integratedLufs: -20,
-          loudnessRange: 12,
-          stereoWidth: 0.5,
-          spectralCentroid: 2000
-        });
-        const v2 = createVersion('v2', 'v1', { 
-          integratedLufs: -12,
-          loudnessRange: 6,
-          stereoWidth: 0.9,
-          spectralCentroid: 4000
-        });
-
-        const delta = calculateDelta(v1, v2);
-        const result = inferTransformation(delta);
-
-        expect(result.changedMetrics.length).toBeGreaterThan(2);
-      });
-
-      it('should include description', () => {
-        const v1 = createVersion('v1', null);
-        const v2 = createVersion('v2', 'v1', { integratedLufs: -10 });
-
-        const delta = calculateDelta(v1, v2);
-        const result = inferTransformation(delta);
-
-        expect(result.description).toBeDefined();
-      });
-
-      it('should handle invalid delta input', () => {
-        const result = inferTransformation(null);
-
-        expect(result.success).toBe(false);
-        expect(result.transformation).toBe(TransformationType.UNKNOWN);
-      });
-    });
-
-    describe('traceLineage', () => {
-      it('should trace path to root', () => {
-        const versions = createLinearLineage();
-        const tree = buildLineageTree(versions);
-
-        const result = traceLineage(tree, 'v4');
-
-        expect(result.success).toBe(true);
-        expect(result.path).toEqual(['v1', 'v2', 'v3', 'v4']);
-      });
-
-      it('should identify ancestors', () => {
-        const versions = createLinearLineage();
-        const tree = buildLineageTree(versions);
-
-        const result = traceLineage(tree, 'v4');
-
-        expect(result.ancestors).toHaveLength(3);
-        expect(result.ancestors[0].id).toBe('v1');
-      });
-
-      it('should identify descendants', () => {
-        const versions = createLinearLineage();
-        const tree = buildLineageTree(versions);
-
-        const result = traceLineage(tree, 'v1');
-
-        expect(result.descendants).toHaveLength(3);
-      });
-
-      it('should correctly identify root', () => {
-        const versions = createLinearLineage();
-        const tree = buildLineageTree(versions);
-
-        const rootResult = traceLineage(tree, 'v1');
-        const childResult = traceLineage(tree, 'v2');
-
-        expect(rootResult.isRoot).toBe(true);
-        expect(childResult.isRoot).toBe(false);
-      });
-
-      it('should correctly identify leaf', () => {
-        const versions = createLinearLineage();
-        const tree = buildLineageTree(versions);
-
-        const leafResult = traceLineage(tree, 'v4');
-        const parentResult = traceLineage(tree, 'v2');
-
-        expect(leafResult.isLeaf).toBe(true);
-        expect(parentResult.isLeaf).toBe(false);
-      });
-
-      it('should return depth', () => {
-        const versions = createLinearLineage();
-        const tree = buildLineageTree(versions);
-
-        const result = traceLineage(tree, 'v4');
-
-        expect(result.depth).toBe(3);
-      });
-
-      it('should handle missing version', () => {
-        const versions = createLinearLineage();
-        const tree = buildLineageTree(versions);
-
-        const result = traceLineage(tree, 'nonexistent');
-
-        expect(result.success).toBe(false);
-      });
-    });
-
-    describe('getRelationship', () => {
-      it('should identify parent relationship', () => {
-        const versions = createLinearLineage();
-        const tree = buildLineageTree(versions);
-
-        const result = getRelationship(tree, 'v2', 'v1');
-
-        expect(result.success).toBe(true);
-        expect(result.relationship).toBe(Relationship.PARENT);
-      });
-
-      it('should identify child relationship', () => {
-        const versions = createLinearLineage();
-        const tree = buildLineageTree(versions);
-
-        const result = getRelationship(tree, 'v1', 'v2');
-
-        expect(result.success).toBe(true);
-        expect(result.relationship).toBe(Relationship.CHILD);
-      });
-
-      it('should identify ancestor relationship', () => {
-        const versions = createLinearLineage();
-        const tree = buildLineageTree(versions);
-
-        const result = getRelationship(tree, 'v4', 'v1');
-
-        expect(result.success).toBe(true);
-        expect(result.relationship).toBe(Relationship.ANCESTOR);
-      });
-
-      it('should identify descendant relationship', () => {
-        const versions = createLinearLineage();
-        const tree = buildLineageTree(versions);
-
-        const result = getRelationship(tree, 'v1', 'v4');
-
-        expect(result.success).toBe(true);
-        expect(result.relationship).toBe(Relationship.DESCENDANT);
-      });
-
-      it('should identify sibling relationship', () => {
-        const versions = createBranchedLineage();
-        const tree = buildLineageTree(versions);
-
-        const result = getRelationship(tree, 'a1', 'b1');
-
-        expect(result.success).toBe(true);
-        expect(result.relationship).toBe(Relationship.SIBLING);
-      });
-
-      it('should include common ancestor for siblings', () => {
-        const versions = createBranchedLineage();
-        const tree = buildLineageTree(versions);
-
-        const result = getRelationship(tree, 'a2', 'b2');
-
-        expect(result.commonAncestor || result.commonParent).toBeDefined();
-      });
-
-      it('should handle unrelated versions', () => {
-        const versions = [
-          createVersion('a', null),
-          createVersion('b', null)  // Different root
-        ];
-        const tree = buildLineageTree(versions);
-
-        const result = getRelationship(tree, 'a', 'b');
-
-        expect(result.relationship).toBe(Relationship.UNRELATED);
-      });
+  describe('Remastering Chain', () => {
+    it('should track across remaster versions', () => {
+      const versions = [originalVersion, masteredVersion, remaster];
+      const result = analyze(versions);
+      
+      expect(result.versionSummary[2].relation).toBe(VersionRelation.REMASTER);
     });
   });
 
-  // ============================================================================
-  // Analysis Function Tests
-  // ============================================================================
-
-  describe('Analysis Functions', () => {
-    describe('analyzeLineageHealth', () => {
-      it('should return healthy for stable lineage', () => {
-        const versions = [
-          createVersion('v1', null, { integratedLufs: -14 }),
-          createVersion('v2', 'v1', { integratedLufs: -14.5 }),  // Minor change
-          createVersion('v3', 'v2', { integratedLufs: -14 })
-        ];
-
-        const result = analyzeLineageHealth(versions);
-
-        expect(result.success).toBe(true);
-        expect(result.health).toBe(LineageHealth.HEALTHY);
-      });
-
-      it('should identify critical issues', () => {
-        const versions = [
-          createVersion('v1', null, { integratedLufs: -20 }),
-          createVersion('v2', 'v1', { integratedLufs: -6 })  // 14 dB change - critical
-        ];
-
-        const result = analyzeLineageHealth(versions);
-
-        expect(result.health).toBe(LineageHealth.CRITICAL);
-        expect(result.summary.criticalIssues).toBeGreaterThan(0);
-      });
-
-      it('should include issue details', () => {
-        const versions = [
-          createVersion('v1', null, { integratedLufs: -20 }),
-          createVersion('v2', 'v1', { integratedLufs: -10 })
-        ];
-
-        const result = analyzeLineageHealth(versions);
-
-        expect(result.issues).toBeDefined();
-        expect(result.issues.length).toBeGreaterThan(0);
-      });
-
-      it('should include transitions analysis', () => {
-        const versions = createLinearLineage();
-        const result = analyzeLineageHealth(versions);
-
-        expect(result.transitions).toBeDefined();
-        expect(result.transitions.length).toBe(3);  // 3 transitions in 4-version chain
-      });
-
-      it('should include health description', () => {
-        const versions = createLinearLineage();
-        const result = analyzeLineageHealth(versions);
-
-        expect(result.healthDescription).toBeDefined();
-      });
-
-      it('should handle single version', () => {
-        const result = analyzeLineageHealth([createVersion('v1', null)]);
-
-        expect(result.success).toBe(false);
-      });
-
-      it('should detect unexpected metric changes', () => {
-        const versions = [
-          createVersion('v1', null, { 
-            integratedLufs: -14,
-            loudnessRange: 8
-          }),
-          createVersion('v2', 'v1', { 
-            integratedLufs: -11,  // Level change
-            loudnessRange: 4  // Should be preserved for level change
-          })
-        ];
-
-        const result = analyzeLineageHealth(versions);
-
-        const unexpectedIssues = result.issues.filter(i => 
-          i.type === 'unexpected_change'
-        );
-        expect(unexpectedIssues.length).toBeGreaterThanOrEqual(0);
-      });
-    });
-
-    describe('findVersions', () => {
-      it('should find versions by state', () => {
-        const versions = createLinearLineage();
-        const tree = buildLineageTree(versions);
-
-        const result = findVersions(tree, { state: VersionState.FINAL });
-
-        expect(result.success).toBe(true);
-        expect(result.matches.length).toBe(1);
-        expect(result.matches[0].id).toBe('v4');
-      });
-
-      it('should find root versions', () => {
-        const versions = createLinearLineage();
-        const tree = buildLineageTree(versions);
-
-        const result = findVersions(tree, { isRoot: true });
-
-        expect(result.matches.length).toBe(1);
-        expect(result.matches[0].id).toBe('v1');
-      });
-
-      it('should find leaf versions', () => {
-        const versions = createBranchedLineage();
-        const tree = buildLineageTree(versions);
-
-        const result = findVersions(tree, { isLeaf: true });
-
-        expect(result.matches.length).toBe(2);  // a2 and b2
-      });
-
-      it('should find by depth range', () => {
-        const versions = createLinearLineage();
-        const tree = buildLineageTree(versions);
-
-        const result = findVersions(tree, { minDepth: 2, maxDepth: 3 });
-
-        expect(result.matches.length).toBe(2);  // v3 and v4
-      });
-
-      it('should return all when no criteria', () => {
-        const versions = createLinearLineage();
-        const tree = buildLineageTree(versions);
-
-        const result = findVersions(tree, {});
-
-        expect(result.matches.length).toBe(4);
-      });
-    });
-
-    describe('compareBranches', () => {
-      it('should compare two branches', () => {
-        const versions = createBranchedLineage();
-
-        const result = compareBranches(versions, 'a1', 'b1');
-
-        expect(result.success).toBe(true);
-        expect(result.branchA).toBeDefined();
-        expect(result.branchB).toBeDefined();
-      });
-
-      it('should calculate metric differences', () => {
-        const versions = createBranchedLineage();
-
-        const result = compareBranches(versions, 'a1', 'b1');
-
-        expect(result.comparison).toBeDefined();
-        expect(result.comparison.lufsDelta).toBeDefined();
-      });
-
-      it('should include version counts', () => {
-        const versions = createBranchedLineage();
-
-        const result = compareBranches(versions, 'a1', 'b1');
-
-        expect(result.branchA.metrics.versionCount).toBe(2);
-        expect(result.branchB.metrics.versionCount).toBe(2);
-      });
-
-      it('should handle missing branch', () => {
-        const versions = createLinearLineage();
-
-        const result = compareBranches(versions, 'v1', 'nonexistent');
-
-        expect(result.success).toBe(false);
-      });
+  describe('Loudness War Detection', () => {
+    it('should detect and warn about escalating loudness', () => {
+      const result = analyze(loudnessWarVersions.map((v, i) => ({
+        ...v,
+        id: `v${i + 1}`,
+        name: `Master v${i + 1}`,
+        createdAt: new Date(Date.now() + i * 86400000).toISOString()
+      })));
+      
+      expect(result.trend).toBe(QualityTrend.DEGRADING);
+      expect(result.patterns.some(p => p.type === 'LOUDNESS_ESCALATION')).toBe(true);
     });
   });
 
-  // ============================================================================
-  // Quick Check Tests
-  // ============================================================================
-
-  describe('Quick Check Functions', () => {
-    describe('quickCheck', () => {
-      it('should return quick status', () => {
-        const versions = createLinearLineage();
-
-        const result = quickCheck(versions, 'v3');
-
-        expect(result.valid).toBe(true);
-        expect(result.versionId).toBe('v3');
-      });
-
-      it('should include depth', () => {
-        const versions = createLinearLineage();
-
-        const result = quickCheck(versions, 'v4');
-
-        expect(result.depth).toBe(3);
-      });
-
-      it('should include ancestor count', () => {
-        const versions = createLinearLineage();
-
-        const result = quickCheck(versions, 'v4');
-
-        expect(result.ancestorCount).toBe(3);
-      });
-
-      it('should identify root and leaf status', () => {
-        const versions = createLinearLineage();
-
-        const rootResult = quickCheck(versions, 'v1');
-        const leafResult = quickCheck(versions, 'v4');
-
-        expect(rootResult.isRoot).toBe(true);
-        expect(leafResult.isLeaf).toBe(true);
-      });
-
-      it('should include last transition info', () => {
-        const versions = createLinearLineage();
-
-        const result = quickCheck(versions, 'v2');
-
-        expect(result.lastTransition).toBeDefined();
-        expect(result.lastTransition.from).toBe('v1');
-      });
-
-      it('should handle missing version', () => {
-        const versions = createLinearLineage();
-
-        const result = quickCheck(versions, 'nonexistent');
-
-        expect(result.valid).toBe(false);
-      });
-
-      it('should include full path', () => {
-        const versions = createLinearLineage();
-
-        const result = quickCheck(versions, 'v3');
-
-        expect(result.path).toEqual(['v1', 'v2', 'v3']);
-      });
-    });
-
-    describe('validateIntegrity', () => {
-      it('should validate correct lineage', () => {
-        const versions = createLinearLineage();
-
-        const result = validateIntegrity(versions);
-
-        expect(result.valid).toBe(true);
-        expect(result.issues).toHaveLength(0);
-      });
-
-      it('should detect orphan references', () => {
-        const versions = [
-          createVersion('v1', null),
-          createVersion('v2', 'missing_parent')
-        ];
-
-        const result = validateIntegrity(versions);
-
-        expect(result.valid).toBe(false);
-        const orphanIssues = result.issues.filter(i => i.type === 'orphan_reference');
-        expect(orphanIssues.length).toBeGreaterThan(0);
-      });
-
-      it('should detect duplicate IDs', () => {
-        const versions = [
-          createVersion('v1', null),
-          createVersion('v1', null)  // Duplicate
-        ];
-
-        const result = validateIntegrity(versions);
-
-        expect(result.valid).toBe(false);
-        const dupIssues = result.issues.filter(i => i.type === 'duplicate_id');
-        expect(dupIssues.length).toBeGreaterThan(0);
-      });
-
-      it('should include stats', () => {
-        const versions = createLinearLineage();
-
-        const result = validateIntegrity(versions);
-
-        expect(result.stats).toBeDefined();
-        expect(result.stats.totalVersions).toBe(4);
-      });
+  describe('Quality Assurance', () => {
+    it('should recommend action for severe degradation', () => {
+      const degradedVersions = [
+        { integratedLoudness: -20, loudnessRange: 14, sampleRate: 96000 },
+        { integratedLoudness: -14, loudnessRange: 10, sampleRate: 48000 },
+        { integratedLoudness: -8, loudnessRange: 5, sampleRate: 44100 }
+      ].map((v, i) => ({
+        ...v,
+        id: `v${i + 1}`,
+        createdAt: new Date(Date.now() + i * 86400000).toISOString()
+      }));
+      
+      const result = analyze(degradedVersions);
+      
+      expect(result.recommendations.length).toBeGreaterThan(0);
+      expect(result.recommendations.some(r => r.priority === 'HIGH')).toBe(true);
     });
   });
 
-  // ============================================================================
-  // Helper Function Tests
-  // ============================================================================
-
-  describe('Helper Functions', () => {
-    describe('formatVersionInfo', () => {
-      it('should format version node info', () => {
-        const node = {
-          id: 'test',
-          state: VersionState.DERIVED,
-          depth: 2,
-          children: [{ id: 'child' }],
-          parentId: 'parent'
-        };
-
-        const result = formatVersionInfo(node);
-
-        expect(result.id).toBe('test');
-        expect(result.state).toBe(VersionState.DERIVED);
-        expect(result.depth).toBe(2);
-        expect(result.hasChildren).toBe(true);
-        expect(result.hasParent).toBe(true);
-      });
-
-      it('should handle leaf nodes', () => {
-        const node = {
-          id: 'leaf',
-          state: VersionState.FINAL,
-          depth: 3,
-          children: [],
-          parentId: 'parent'
-        };
-
-        const result = formatVersionInfo(node);
-
-        expect(result.hasChildren).toBe(false);
-      });
+  describe('Remix Tracking', () => {
+    it('should identify remixes by duration change', () => {
+      const versions = [
+        { ...originalVersion, duration: 180 },
+        { ...originalVersion, name: 'Extended', duration: 360 }
+      ];
+      
+      const lineage = buildLineage(versions);
+      
+      expect(lineage.versions[1].relation).toBe(VersionRelation.REMIX);
     });
   });
+});
 
-  // ============================================================================
-  // Integration Tests
-  // ============================================================================
+// ============================================================================
+// Edge Cases
+// ============================================================================
 
-  describe('Integration Tests', () => {
-    describe('Full workflow scenarios', () => {
-      it('should handle complete mastering workflow', () => {
-        const versions = [
-          createVersion('raw', null, { 
-            integratedLufs: -22, 
-            loudnessRange: 14,
-            truePeakDbtp: -6
-          }),
-          createVersion('edited', 'raw', { 
-            integratedLufs: -20, 
-            loudnessRange: 12,
-            truePeakDbtp: -4
-          }),
-          createVersion('mixed', 'edited', { 
-            integratedLufs: -16, 
-            loudnessRange: 8,
-            truePeakDbtp: -2
-          }),
-          createVersion('mastered', 'mixed', { 
-            integratedLufs: -14, 
-            loudnessRange: 7,
-            truePeakDbtp: -1
-          })
-        ];
-
-        const health = analyzeLineageHealth(versions);
-        const tree = buildLineageTree(versions);
-        const lineage = traceLineage(tree, 'mastered');
-
-        expect(health.success).toBe(true);
-        expect(lineage.path).toHaveLength(4);
-        expect(lineage.isLeaf).toBe(true);
-      });
-
-      it('should detect problematic version', () => {
-        const versions = [
-          createVersion('v1', null, { integratedLufs: -14 }),
-          createVersion('v2', 'v1', { integratedLufs: -14 }),
-          createVersion('v3', 'v2', { integratedLufs: 0 }),  // Problem!
-          createVersion('v4', 'v3', { integratedLufs: -14 })
-        ];
-
-        const health = analyzeLineageHealth(versions);
-
-        expect(health.health).toBe(LineageHealth.CRITICAL);
-        expect(health.issues.some(i => 
-          i.from === 'v2' && i.to === 'v3'
-        )).toBe(true);
-      });
-
-      it('should track parallel branches', () => {
-        const versions = createBranchedLineage();
-        const tree = buildLineageTree(versions);
-
-        const branchALineage = traceLineage(tree, 'a2');
-        const branchBLineage = traceLineage(tree, 'b2');
-
-        expect(branchALineage.root).toBe('root');
-        expect(branchBLineage.root).toBe('root');
-        expect(branchALineage.path).not.toEqual(branchBLineage.path);
-      });
-    });
-
-    describe('Edge cases', () => {
-      it('should handle single root with no children', () => {
-        const versions = [createVersion('only', null)];
-        const tree = buildLineageTree(versions);
-
-        expect(tree.success).toBe(true);
-        expect(tree.tree.maxDepth).toBe(0);
-      });
-
-      it('should handle deep lineage', () => {
-        const versions = [];
-        for (let i = 0; i < 10; i++) {
-          versions.push(createVersion(`v${i}`, i > 0 ? `v${i-1}` : null));
-        }
-
-        const tree = buildLineageTree(versions);
-
-        expect(tree.success).toBe(true);
-        expect(tree.tree.maxDepth).toBe(9);
-      });
-
-      it('should handle wide branching', () => {
-        const versions = [
-          createVersion('root', null),
-          ...Array.from({ length: 10 }, (_, i) => 
-            createVersion(`child${i}`, 'root')
-          )
-        ];
-
-        const tree = buildLineageTree(versions);
-        const rootNode = tree.tree.nodeMap.get('root');
-
-        expect(rootNode.children.length).toBe(10);
-      });
-    });
+describe('Edge Cases', () => {
+  it('should handle versions with missing metrics', () => {
+    const sparse = [
+      { id: 'v1', integratedLoudness: -14 },
+      { id: 'v2', integratedLoudness: -12 }
+    ];
+    
+    const result = analyze(sparse);
+    
+    expect(result.error).toBeUndefined();
+    expect(result.versionCount).toBe(2);
   });
 
-  // ============================================================================
-  // API Contract Tests
-  // ============================================================================
+  it('should handle identical versions', () => {
+    const identical = [originalVersion, { ...originalVersion, id: 'v2' }];
+    const result = analyze(identical);
+    
+    expect(result.cumulativeImpact.totalImpact).toBe(0);
+    expect(result.cumulativeImpact.impactLevel).toBe(ImpactLevel.NONE);
+  });
 
-  describe('API Contract', () => {
-    it('should export all required enums', () => {
-      expect(VersionState).toBeDefined();
-      expect(Relationship).toBeDefined();
-      expect(DeltaSeverity).toBeDefined();
-      expect(TransformationType).toBeDefined();
-      expect(LineageHealth).toBeDefined();
-      expect(Confidence).toBeDefined();
-    });
+  it('should handle very small changes', () => {
+    const tiny = [
+      { ...originalVersion },
+      { ...originalVersion, id: 'v2', integratedLoudness: -13.5 } // 0.5 dB change to trigger MINIMAL
+    ];
+    
+    const result = analyze(tiny);
+    
+    expect([ImpactLevel.NONE, ImpactLevel.MINIMAL, ImpactLevel.LOW])
+      .toContain(result.cumulativeImpact.impactLevel);
+  });
 
-    it('should export all required constants', () => {
-      expect(DELTA_THRESHOLDS).toBeDefined();
-      expect(TRANSFORMATION_PATTERNS).toBeDefined();
-      expect(STATUS_DESCRIPTIONS).toBeDefined();
-    });
+  it('should handle many generations', () => {
+    const many = Array(10).fill(null).map((_, i) => ({
+      id: `v${i + 1}`,
+      integratedLoudness: -14 + i * 0.3,
+      createdAt: new Date(Date.now() + i * 86400000).toISOString()
+    }));
+    
+    const result = analyze(many);
+    
+    expect(result.versionCount).toBe(10);
+    expect(result.cumulativeImpact.warnings.some(w => 
+      w.type === 'EXCESSIVE_GENERATIONS'
+    )).toBe(true);
+  });
 
-    it('should export all required functions', () => {
-      expect(typeof buildLineageTree).toBe('function');
-      expect(typeof calculateDelta).toBe('function');
-      expect(typeof inferTransformation).toBe('function');
-      expect(typeof traceLineage).toBe('function');
-      expect(typeof getRelationship).toBe('function');
-      expect(typeof analyzeLineageHealth).toBe('function');
-      expect(typeof findVersions).toBe('function');
-      expect(typeof compareBranches).toBe('function');
-      expect(typeof quickCheck).toBe('function');
-      expect(typeof validateIntegrity).toBe('function');
-      expect(typeof formatVersionInfo).toBe('function');
-    });
-
-    it('should maintain consistent return shapes', () => {
-      const versions = createLinearLineage();
-
-      // buildLineageTree
-      const tree = buildLineageTree(versions);
-      expect(tree).toHaveProperty('success');
-      expect(tree).toHaveProperty('tree');
-
-      // calculateDelta
-      const delta = calculateDelta(versions[0], versions[1]);
-      expect(delta).toHaveProperty('success');
-      expect(delta).toHaveProperty('deltas');
-
-      // traceLineage
-      const lineage = traceLineage(tree, 'v2');
-      expect(lineage).toHaveProperty('success');
-      expect(lineage).toHaveProperty('path');
-
-      // quickCheck
-      const quick = quickCheck(versions, 'v2');
-      expect(quick).toHaveProperty('valid');
-    });
+  it('should handle unsorted input', () => {
+    const unsorted = [
+      { ...remaster, createdAt: '2024-06-01T00:00:00Z' },
+      { ...originalVersion, createdAt: '2024-01-01T00:00:00Z' },
+      { ...masteredVersion, createdAt: '2024-03-01T00:00:00Z' }
+    ];
+    
+    const result = analyze(unsorted);
+    
+    // Should be sorted by date
+    expect(result.versionSummary[0].name).toBe('Original Mix');
   });
 });

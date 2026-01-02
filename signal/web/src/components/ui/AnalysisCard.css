@@ -1,0 +1,171 @@
+/**
+ * AnalysisCard Styles
+ * Expandable analysis result cards
+ */
+
+.analysis-card {
+  background-color: var(--color-gray-900);
+  border: 1px solid var(--color-gray-800);
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+  transition: border-color var(--duration-150) var(--ease-out);
+}
+
+.analysis-card:hover {
+  border-color: var(--color-gray-700);
+}
+
+/* Status accent on left border */
+.analysis-card.status-pass {
+  border-left: 3px solid var(--color-success);
+}
+
+.analysis-card.status-pending {
+  border-left: 3px solid var(--color-warning);
+}
+
+.analysis-card.status-fail {
+  border-left: 3px solid var(--color-danger);
+}
+
+.analysis-card.status-neutral {
+  border-left: 3px solid var(--color-gray-600);
+}
+
+.analysis-card.status-info {
+  border-left: 3px solid var(--color-primary);
+}
+
+/* Header */
+.analysis-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--duration-150) var(--ease-out);
+}
+
+.analysis-card-header:hover {
+  background-color: var(--color-gray-800);
+}
+
+.analysis-card-header:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.analysis-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.analysis-card-title {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-white);
+}
+
+.analysis-card-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.analysis-card-summary {
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-400);
+  font-variant-numeric: tabular-nums;
+}
+
+.analysis-card-chevron {
+  color: var(--color-gray-500);
+  transition: transform var(--duration-200) var(--ease-out);
+}
+
+.analysis-card-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+/* Content */
+.analysis-card-content {
+  padding: var(--space-4);
+  padding-top: 0;
+  border-top: 1px solid var(--color-gray-800);
+}
+
+/* Metrics grid */
+.analysis-card-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+}
+
+.analysis-metric {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.analysis-metric-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-500);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.analysis-metric-value {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-white);
+  font-variant-numeric: tabular-nums;
+}
+
+.analysis-metric-unit {
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-500);
+  font-weight: var(--font-weight-normal);
+}
+
+/* Details */
+.analysis-card-details {
+  padding: var(--space-3) 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-400);
+  line-height: var(--line-height-relaxed);
+}
+
+/* Actions */
+.analysis-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-gray-800);
+}
+
+.analysis-card-action {
+  padding: var(--space-2) var(--space-4);
+  background-color: var(--color-gray-800);
+  border: 1px solid var(--color-gray-700);
+  border-radius: var(--border-radius);
+  color: var(--color-white);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: 
+    background-color var(--duration-150) var(--ease-out),
+    border-color var(--duration-150) var(--ease-out);
+}
+
+.analysis-card-action:hover {
+  background-color: var(--color-gray-700);
+  border-color: var(--color-gray-600);
+}
