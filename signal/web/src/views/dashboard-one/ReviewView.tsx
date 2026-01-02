@@ -89,108 +89,116 @@ export function ReviewView({ projectId, role, onNavigate }: ReviewViewProps) {
   const loading = loadingProjects;
 
   if (loading) {
-    return <div className="view-loading">Loading...</div>;
+    return <div className="loading">Loading...</div>;
   }
 
   return (
-    <div className="review-view">
-      <header className="view-header">
-        <h2 className="view-title">Review</h2>
-        <p className="view-subtitle">Evaluate derived assets and approve for delivery</p>
+    <div className="view">
+      {/* Header */}
+      <header className="view__header">
+        <h2 className="view__title">Review</h2>
+        <p className="view__subtitle">Evaluate derived assets and approve for delivery</p>
       </header>
 
       {/* Project Selection */}
-      <section className="project-section">
-        <label className="section-label">Project</label>
-        <select 
-          className="project-select"
-          value={selectedProjectId || ''} 
-          onChange={(e) => {
-            setSelectedProjectId(parseInt(e.target.value));
-            setSelectedAsset(null);
-          }}
-        >
-          <option value="">Select Project</option>
-          {projects.map(p => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
+      <section className="section">
+        <div className="form-group">
+          <label className="form-label">Project</label>
+          <select 
+            className="form-select"
+            style={{ minWidth: '240px' }}
+            value={selectedProjectId || ''} 
+            onChange={(e) => {
+              setSelectedProjectId(parseInt(e.target.value));
+              setSelectedAsset(null);
+            }}
+          >
+            <option value="">Select Project</option>
+            {projects.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
       </section>
 
-      {error && <div className="view-error">{error}</div>}
-      {success && <div className="view-success">{success}</div>}
+      {error && <div className="error-message">{error}</div>}
+      {success && <div style={{ padding: 'var(--space-4)', background: 'rgba(34, 197, 94, 0.1)', borderRadius: 'var(--border-radius)', color: 'var(--color-success)', marginBottom: 'var(--space-4)' }}>{success}</div>}
 
       {/* Pending Review List */}
-      <section className="review-list">
-        <h3 className="section-title">
-          Pending Review ({assets.length})
-          {loadingAssets && <span className="loading-badge">Loading...</span>}
-        </h3>
+      <section className="section">
+        <div className="section__header">
+          <h3 className="section__title">
+            Pending Review ({assets.length})
+          </h3>
+          {loadingAssets && <span className="badge badge--neutral">Loading...</span>}
+        </div>
         
         {assets.length === 0 ? (
           <div className="empty-state">
-            <p>No derived assets pending review.</p>
-            <button className="btn-secondary" onClick={() => onNavigate('transform')}>
-              Transform assets to create derived outputs →
+            <span className="empty-state__icon">📋</span>
+            <p className="empty-state__title">No derived assets pending review</p>
+            <p className="empty-state__description">Transform assets to create derived outputs.</p>
+            <button className="btn btn--secondary" onClick={() => onNavigate('transform')}>
+              Go to Transform →
             </button>
           </div>
         ) : (
-          <div className="review-grid">
+          <div className="cards-grid">
             {assets.map(asset => (
               <div 
                 key={asset.id} 
-                className={`review-card ${selectedAsset?.id === asset.id ? 'selected' : ''}`}
+                className={`card card--interactive ${selectedAsset?.id === asset.id ? 'card--selected' : ''}`}
                 onClick={() => selectAsset(asset)}
               >
-                <div className="card-header">
-                  <span className="asset-name">{asset.name}</span>
-                  <span className="category-badge">DERIVED</span>
+                <div className="card__body">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-3)' }}>
+                    <span style={{ fontWeight: 500, color: 'var(--color-white)' }}>{asset.name}</span>
+                    <span className="badge badge--warning">DERIVED</span>
+                  </div>
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-gray-400)' }}>
+                    Created: {new Date(asset.createdAt).toLocaleDateString()}
+                  </div>
+                  <button className="btn btn--secondary btn--sm" style={{ marginTop: 'var(--space-3)', width: '100%' }} onClick={() => selectAsset(asset)}>
+                    Review
+                  </button>
                 </div>
-                <div className="card-meta">
-                  <span>Created: {new Date(asset.createdAt).toLocaleDateString()}</span>
-                </div>
-                <button className="btn-review" onClick={() => selectAsset(asset)}>
-                  Review
-                </button>
               </div>
             ))}
           </div>
         )}
       </section>
 
-      {/* Review Panel - Component: ProcessingReport + AudioComparison */}
+      {/* Review Panel */}
       {selectedAsset && (
-        <section className="review-panel">
-          <h3 className="panel-title">Review: {selectedAsset.name}</h3>
+        <section className="section section--bordered">
+          <h3 className="section__title">Review: {selectedAsset.name}</h3>
           
           {/* Asset Details */}
-          <div className="asset-details">
-            <div className="detail-row">
-              <span className="label">Category:</span>
-              <span className="value">{selectedAsset.category}</span>
-            </div>
-            <div className="detail-row">
-              <span className="label">Type:</span>
-              <span className="value">{selectedAsset.mimeType}</span>
-            </div>
-            <div className="detail-row">
-              <span className="label">Created:</span>
-              <span className="value">{new Date(selectedAsset.createdAt).toLocaleString()}</span>
+          <div className="card" style={{ marginBottom: 'var(--space-4)' }}>
+            <div className="card__body">
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 'var(--space-2) var(--space-4)', fontSize: 'var(--font-size-sm)' }}>
+                <span style={{ color: 'var(--color-gray-400)' }}>Category:</span>
+                <span style={{ color: 'var(--color-white)' }}>{selectedAsset.category}</span>
+                <span style={{ color: 'var(--color-gray-400)' }}>Type:</span>
+                <span style={{ color: 'var(--color-white)' }}>{selectedAsset.mimeType}</span>
+                <span style={{ color: 'var(--color-gray-400)' }}>Created:</span>
+                <span style={{ color: 'var(--color-white)' }}>{new Date(selectedAsset.createdAt).toLocaleString()}</span>
+              </div>
             </div>
           </div>
 
-          {/* Processing Report — Component: ProcessingReport */}
-          <div className="report-section">
-            <h4 className="section-subtitle">Processing Report</h4>
+          {/* Processing Report */}
+          <div style={{ marginBottom: 'var(--space-4)' }}>
+            <h4 className="section__title" style={{ fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-3)' }}>Processing Report</h4>
             <ProcessingReport 
               jobId={selectedAsset.outputJobId || undefined}
               isLive={false}
             />
           </div>
 
-          {/* Audio Comparison — Component: AudioComparison */}
-          <div className="comparison-section">
-            <h4 className="section-subtitle">Before / After Comparison</h4>
+          {/* Audio Comparison */}
+          <div style={{ marginBottom: 'var(--space-4)' }}>
+            <h4 className="section__title" style={{ fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-3)' }}>Before / After Comparison</h4>
             <AudioComparison 
               inputAsset={selectedAsset.parent || null}
               outputAsset={selectedAsset}
@@ -199,46 +207,57 @@ export function ReviewView({ projectId, role, onNavigate }: ReviewViewProps) {
 
           {/* Approval Form */}
           {canApprove ? (
-            <div className="approval-form">
-              <label className="form-label">Approval Comment (optional)</label>
-              <textarea
-                value={approvalComment}
-                onChange={(e) => setApprovalComment(e.target.value)}
-                placeholder="Add notes about this approval..."
-                rows={3}
-                className="approval-textarea"
-              />
+            <div className="card">
+              <div className="card__body">
+                <div className="form-group" style={{ marginBottom: 'var(--space-4)' }}>
+                  <label className="form-label">Approval Comment (optional)</label>
+                  <textarea
+                    value={approvalComment}
+                    onChange={(e) => setApprovalComment(e.target.value)}
+                    placeholder="Add notes about this approval..."
+                    rows={3}
+                    className="form-input"
+                    style={{ width: '100%', resize: 'vertical' }}
+                  />
+                </div>
 
-              <div className="approval-actions">
-                <button 
-                  onClick={handleApprove} 
-                  disabled={submitting}
-                  className="btn-approve"
-                >
-                  {submitting ? 'Approving...' : 'Approve (Promote to Final)'}
-                </button>
-                <button 
-                  onClick={() => setSelectedAsset(null)}
-                  className="btn-cancel"
-                >
-                  Cancel
-                </button>
+                <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+                  <button 
+                    onClick={handleApprove} 
+                    disabled={submitting}
+                    className="btn btn--primary"
+                  >
+                    {submitting ? 'Approving...' : 'Approve (Promote to Final)'}
+                  </button>
+                  <button 
+                    onClick={() => setSelectedAsset(null)}
+                    className="btn btn--secondary"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
-            <p className="role-notice">
-              Basic role: You can review assets but cannot approve. Contact a Standard or Advanced user for approval.
-            </p>
+            <div className="card">
+              <div className="card__body" style={{ color: 'var(--color-gray-400)', fontSize: 'var(--font-size-sm)' }}>
+                Basic role: You can review assets but cannot approve. Contact a Standard or Advanced user for approval.
+              </div>
+            </div>
           )}
         </section>
       )}
 
       {/* Quick Navigation */}
-      <footer className="view-footer">
-        <button className="btn-secondary" onClick={() => onNavigate('deliver')}>
-          Go to Deliver (for Final assets) →
+      <section className="section section--bordered">
+        <button className="action-card" onClick={() => onNavigate('deliver')}>
+          <span className="action-card__icon">📤</span>
+          <span className="action-card__content">
+            <span className="action-card__label">Go to Deliver</span>
+            <span className="action-card__description">Export final assets to platforms</span>
+          </span>
         </button>
-      </footer>
+      </section>
     </div>
   );
 }

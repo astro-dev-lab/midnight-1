@@ -114,110 +114,127 @@ export function DeliverView({ projectId, role, onNavigate }: DeliverViewProps) {
   };
 
   if (loading) {
-    return <div className="view-loading">Loading...</div>;
+    return <div className="loading">Loading...</div>;
   }
 
   return (
-    <div className="deliver-view">
-      <header className="view-header">
-        <h2 className="view-title">Deliver</h2>
-        <p className="view-subtitle">Export final assets to platforms and destinations</p>
+    <div className="view">
+      {/* Header */}
+      <header className="view__header">
+        <h2 className="view__title">Deliver</h2>
+        <p className="view__subtitle">Export final assets to platforms and destinations</p>
       </header>
 
       {/* Project Selection */}
-      <section className="project-section">
-        <label className="section-label">Project</label>
-        <select 
-          className="project-select"
-          value={selectedProjectId || ''} 
-          onChange={(e) => {
-            setSelectedProjectId(parseInt(e.target.value));
-            setSelectedAssetIds([]);
-          }}
-        >
-          <option value="">Select Project</option>
-          {projects.map(p => (
-            <option key={p.id} value={p.id}>{p.name} ({p.state})</option>
-          ))}
-        </select>
+      <section className="section">
+        <div className="form-group">
+          <label className="form-label">Project</label>
+          <select 
+            className="form-select"
+            style={{ minWidth: '240px' }}
+            value={selectedProjectId || ''} 
+            onChange={(e) => {
+              setSelectedProjectId(parseInt(e.target.value));
+              setSelectedAssetIds([]);
+            }}
+          >
+            <option value="">Select Project</option>
+            {projects.map(p => (
+              <option key={p.id} value={p.id}>{p.name} ({p.state})</option>
+            ))}
+          </select>
+        </div>
       </section>
 
-      {error && <div className="view-error">{error}</div>}
-      {success && <div className="view-success">{success}</div>}
+      {error && <div className="error-message">{error}</div>}
+      {success && <div style={{ padding: 'var(--space-4)', background: 'rgba(34, 197, 94, 0.1)', borderRadius: 'var(--border-radius)', color: 'var(--color-success)', marginBottom: 'var(--space-4)' }}>{success}</div>}
 
       {/* Asset Selection */}
-      <section className="assets-section">
-        <h3 className="section-title">
+      <section className="section">
+        <h3 className="section__title">
           Select Final Assets ({selectedAssetIds.length} of {finalAssets.length})
         </h3>
         
         {finalAssets.length === 0 ? (
           <div className="empty-state">
-            <p>No final assets available for delivery.</p>
-            <button className="btn-secondary" onClick={() => onNavigate('review')}>
-              Approve derived assets first →
+            <span className="empty-state__icon">📦</span>
+            <p className="empty-state__title">No final assets available</p>
+            <p className="empty-state__description">Approve derived assets first.</p>
+            <button className="btn btn--secondary" onClick={() => onNavigate('review')}>
+              Go to Review →
             </button>
           </div>
         ) : (
-          <div className="asset-grid">
-            {finalAssets.map(asset => (
-              <label 
-                key={asset.id} 
-                className={`asset-card ${selectedAssetIds.includes(asset.id) ? 'selected' : ''}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedAssetIds.includes(asset.id)}
-                  onChange={() => handleAssetToggle(asset.id)}
-                  disabled={!canBatchDeliver && selectedAssetIds.length >= 1 && !selectedAssetIds.includes(asset.id)}
-                />
-                <span className="asset-name">{asset.name}</span>
-                <span className="category-badge">FINAL</span>
-              </label>
-            ))}
+          <div className="card">
+            <div className="card__body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              {finalAssets.map(asset => (
+                <label 
+                  key={asset.id} 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 'var(--space-3)', 
+                    padding: 'var(--space-3)',
+                    borderRadius: 'var(--border-radius)',
+                    background: selectedAssetIds.includes(asset.id) ? 'var(--color-gray-800)' : 'transparent',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.15s'
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedAssetIds.includes(asset.id)}
+                    onChange={() => handleAssetToggle(asset.id)}
+                    disabled={!canBatchDeliver && selectedAssetIds.length >= 1 && !selectedAssetIds.includes(asset.id)}
+                    style={{ width: '16px', height: '16px' }}
+                  />
+                  <span style={{ flex: 1, color: 'var(--color-white)' }}>{asset.name}</span>
+                  <span className="badge badge--success">FINAL</span>
+                </label>
+              ))}
+            </div>
           </div>
         )}
         
         {!canBatchDeliver && finalAssets.length > 1 && (
-          <p className="role-notice">
+          <p style={{ marginTop: 'var(--space-3)', fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-400)' }}>
             Basic/Standard role: Select one asset at a time. Upgrade to Advanced for batch delivery.
           </p>
         )}
       </section>
 
-      {/* Platform Exports — Component: PlatformExports */}
-      <section className="export-section">
-        <h3 className="section-title">Export Options</h3>
-        <div className="component-container">
-          <PlatformExports
-            selectedAssets={selectedAssetIds.map(id => String(id))}
-            onStartExport={(configs) => {
-              // Transform export configs and start delivery
-              if (configs.length > 0) {
-                handleStartExport(configs[0].platformId);
-              }
-            }}
-            disabled={submitting || selectedAssetIds.length === 0}
-          />
-        </div>
+      {/* Platform Exports */}
+      <section className="section">
+        <h3 className="section__title">Export Options</h3>
+        <PlatformExports
+          selectedAssets={selectedAssetIds.map(id => String(id))}
+          onStartExport={(configs) => {
+            if (configs.length > 0) {
+              handleStartExport(configs[0].platformId);
+            }
+          }}
+          disabled={submitting || selectedAssetIds.length === 0}
+        />
       </section>
 
-      {/* Delivery Manager — Component: DeliveryManager */}
-      <section className="deliveries-section">
-        <h3 className="section-title">Active Deliveries</h3>
-        <div className="component-container">
-          <DeliveryManager
-            projectId={selectedProjectId || undefined}
-          />
-        </div>
+      {/* Delivery Manager */}
+      <section className="section">
+        <h3 className="section__title">Active Deliveries</h3>
+        <DeliveryManager
+          projectId={selectedProjectId || undefined}
+        />
       </section>
 
       {/* Quick Navigation */}
-      <footer className="view-footer">
-        <button className="btn-secondary" onClick={() => onNavigate('history')}>
-          View Full Delivery History →
+      <section className="section section--bordered">
+        <button className="action-card" onClick={() => onNavigate('history')}>
+          <span className="action-card__icon">📜</span>
+          <span className="action-card__content">
+            <span className="action-card__label">View Full History</span>
+            <span className="action-card__description">See all jobs and deliveries</span>
+          </span>
         </button>
-      </footer>
+      </section>
     </div>
   );
 }

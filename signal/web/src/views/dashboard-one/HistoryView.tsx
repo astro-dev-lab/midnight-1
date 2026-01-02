@@ -127,174 +127,180 @@ export function HistoryView({ projectId, role }: HistoryViewProps) {
   const loading = loadingProjects;
 
   if (loading) {
-    return <div className="view-loading">Loading...</div>;
+    return <div className="loading">Loading...</div>;
   }
 
   return (
-    <div className="history-view">
-      <header className="view-header">
-        <div className="header-content">
-          <h2 className="view-title">History</h2>
-          <span className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
-            {isConnected ? '● Live Updates' : '○ Disconnected'}
-          </span>
+    <div className="view">
+      {/* Header */}
+      <header className="view__header view__header--row">
+        <div>
+          <h2 className="view__title">History</h2>
+          <p className="view__subtitle">Track jobs and deliveries with real-time status updates</p>
         </div>
-        <p className="view-subtitle">Track jobs and deliveries with real-time status updates</p>
+        <span className={`badge ${isConnected ? 'badge--success' : 'badge--neutral'}`}>
+          {isConnected ? '● Live Updates' : '○ Disconnected'}
+        </span>
       </header>
 
       {/* Project Selection */}
-      <section className="controls-section">
-        <select 
-          className="project-select"
-          value={selectedProjectId || ''} 
-          onChange={(e) => {
-            setSelectedProjectId(parseInt(e.target.value));
-            setSelectedJob(null);
-          }}
-        >
-          <option value="">Select Project</option>
-          {projects.map(p => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
+      <section className="section">
+        <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+          <select 
+            className="form-select"
+            style={{ minWidth: '240px' }}
+            value={selectedProjectId || ''} 
+            onChange={(e) => {
+              setSelectedProjectId(parseInt(e.target.value));
+              setSelectedJob(null);
+            }}
+          >
+            <option value="">Select Project</option>
+            {projects.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
       </section>
 
-      {error && <div className="view-error">{error}</div>}
-      {success && <div className="view-success">{success}</div>}
+      {error && <div className="error-message">{error}</div>}
+      {success && <div style={{ padding: 'var(--space-4)', background: 'rgba(34, 197, 94, 0.1)', borderRadius: 'var(--border-radius)', color: 'var(--color-success)', marginBottom: 'var(--space-4)' }}>{success}</div>}
 
       {/* Tab Navigation */}
-      <nav className="tab-nav">
-        <button 
-          className={`tab-btn ${activeTab === 'jobs' ? 'active' : ''}`}
-          onClick={() => setActiveTab('jobs')}
-        >
-          Jobs ({jobs.length})
-        </button>
-        <button 
-          className={`tab-btn ${activeTab === 'deliveries' ? 'active' : ''}`}
-          onClick={() => setActiveTab('deliveries')}
-        >
-          Deliveries ({deliveries.length})
-        </button>
-      </nav>
+      <section className="tabs">
+        <div className="tabs__list">
+          <button 
+            className={`tabs__tab ${activeTab === 'jobs' ? 'tabs__tab--active' : ''}`}
+            onClick={() => setActiveTab('jobs')}
+          >
+            Jobs ({jobs.length})
+          </button>
+          <button 
+            className={`tabs__tab ${activeTab === 'deliveries' ? 'tabs__tab--active' : ''}`}
+            onClick={() => setActiveTab('deliveries')}
+          >
+            Deliveries ({deliveries.length})
+          </button>
+        </div>
 
-      {/* Jobs Tab — Component: JobManager */}
-      {activeTab === 'jobs' && (
-        <section className="jobs-section">
-          <div className="filter-bar">
-            <select 
-              className="state-filter"
-              value={stateFilter} 
-              onChange={(e) => setStateFilter(e.target.value)}
-            >
-              <option value="">All States</option>
-              <option value="QUEUED">Queued</option>
-              <option value="RUNNING">Running</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="FAILED">Failed</option>
-            </select>
-            {loadingJobs && <span className="loading-badge">Refreshing...</span>}
-          </div>
+        {/* Jobs Tab */}
+        {activeTab === 'jobs' && (
+          <div className="tabs__panel tabs__panel--active">
+            <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+              <select 
+                className="form-select"
+                style={{ minWidth: '150px' }}
+                value={stateFilter} 
+                onChange={(e) => setStateFilter(e.target.value)}
+              >
+                <option value="">All States</option>
+                <option value="QUEUED">Queued</option>
+                <option value="RUNNING">Running</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="FAILED">Failed</option>
+              </select>
+              {loadingJobs && <span className="badge badge--neutral">Refreshing...</span>}
+            </div>
 
-          <div className="component-container">
             <JobManager
               projectId={projectId || undefined}
               onJobSelect={(job) => selectJob(job as Job | null)}
             />
-          </div>
 
-          {/* Selected Job Details */}
-          {selectedJob && (
-            <div className="job-details">
-              <h4 className="section-subtitle">Job Details: {selectedJob.preset}</h4>
-              
-              <div className="detail-grid">
-                <div className="detail-item">
-                  <span className="label">State:</span>
-                  <span className={`value state-${selectedJob.state.toLowerCase()}`}>
-                    {selectedJob.state}
-                  </span>
+            {/* Selected Job Details */}
+            {selectedJob && (
+              <div className="card" style={{ marginTop: 'var(--space-4)' }}>
+                <div className="card__header">
+                  <h4 className="card__title">Job Details: {selectedJob.preset}</h4>
                 </div>
-                <div className="detail-item">
-                  <span className="label">Created:</span>
-                  <span className="value">{new Date(selectedJob.createdAt).toLocaleString()}</span>
-                </div>
-                {selectedJob.startedAt && (
-                  <div className="detail-item">
-                    <span className="label">Started:</span>
-                    <span className="value">{new Date(selectedJob.startedAt).toLocaleString()}</span>
+                <div className="card__body">
+                  <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 'var(--space-2) var(--space-4)', fontSize: 'var(--font-size-sm)' }}>
+                    <span style={{ color: 'var(--color-gray-400)' }}>State:</span>
+                    <span className={`badge badge--state-${selectedJob.state.toLowerCase()}`}>
+                      {selectedJob.state}
+                    </span>
+                    <span style={{ color: 'var(--color-gray-400)' }}>Created:</span>
+                    <span style={{ color: 'var(--color-white)' }}>{new Date(selectedJob.createdAt).toLocaleString()}</span>
+                    {selectedJob.startedAt && (
+                      <>
+                        <span style={{ color: 'var(--color-gray-400)' }}>Started:</span>
+                        <span style={{ color: 'var(--color-white)' }}>{new Date(selectedJob.startedAt).toLocaleString()}</span>
+                      </>
+                    )}
+                    {selectedJob.completedAt && (
+                      <>
+                        <span style={{ color: 'var(--color-gray-400)' }}>Completed:</span>
+                        <span style={{ color: 'var(--color-white)' }}>{new Date(selectedJob.completedAt).toLocaleString()}</span>
+                      </>
+                    )}
                   </div>
-                )}
-                {selectedJob.completedAt && (
-                  <div className="detail-item">
-                    <span className="label">Completed:</span>
-                    <span className="value">{new Date(selectedJob.completedAt).toLocaleString()}</span>
-                  </div>
-                )}
-              </div>
 
-              {/* Error Info */}
-              {selectedJob.state === 'FAILED' && (
-                <div className="error-info">
-                  <h5>Error Details</h5>
-                  <p><strong>Category:</strong> {selectedJob.errorCategory || 'Unknown'}</p>
-                  <p><strong>Message:</strong> {selectedJob.errorMessage || 'No details available'}</p>
-                  {canRerun && (
-                    <button 
-                      className="btn-rerun"
-                      onClick={() => handleRerun(selectedJob.id)} 
-                      disabled={submitting}
-                    >
-                      Rerun This Job
-                    </button>
+                  {/* Error Info */}
+                  {selectedJob.state === 'FAILED' && (
+                    <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-4)', background: 'rgba(239, 68, 68, 0.1)', borderRadius: 'var(--border-radius)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                      <h5 style={{ margin: '0 0 var(--space-3)', color: 'var(--color-danger)', fontSize: 'var(--font-size-sm)' }}>Error Details</h5>
+                      <p style={{ margin: '0 0 var(--space-2)', fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-300)' }}>
+                        <strong>Category:</strong> {selectedJob.errorCategory || 'Unknown'}
+                      </p>
+                      <p style={{ margin: '0 0 var(--space-3)', fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-300)' }}>
+                        <strong>Message:</strong> {selectedJob.errorMessage || 'No details available'}
+                      </p>
+                      {canRerun && (
+                        <button 
+                          className="btn btn--primary btn--sm"
+                          onClick={() => handleRerun(selectedJob.id)} 
+                          disabled={submitting}
+                        >
+                          Rerun This Job
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Processing Reports */}
+                  {reports.length > 0 && (
+                    <div style={{ marginTop: 'var(--space-4)' }}>
+                      <h5 style={{ margin: '0 0 var(--space-3)', fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-200)' }}>Processing Reports</h5>
+                      {reports.map((report, index) => (
+                        <div key={index} style={{ padding: 'var(--space-3)', background: 'var(--color-gray-800)', borderRadius: 'var(--border-radius)', fontSize: 'var(--font-size-sm)' }}>
+                          <div style={{ fontWeight: 500, color: 'var(--color-white)', marginBottom: 'var(--space-2)' }}>{report.type}</div>
+                          <div style={{ color: 'var(--color-gray-300)', marginBottom: 'var(--space-1)' }}>
+                            <strong>Summary:</strong> {report.summary}
+                          </div>
+                          <div style={{ color: 'var(--color-gray-300)', marginBottom: 'var(--space-1)' }}>
+                            <strong>Changes:</strong> {report.changesApplied}
+                          </div>
+                          <div style={{ color: 'var(--color-gray-300)', marginBottom: 'var(--space-1)' }}>
+                            <strong>Rationale:</strong> {report.rationale}
+                          </div>
+                          <div style={{ color: 'var(--color-gray-300)' }}>
+                            <strong>Confidence:</strong> {report.confidence}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {!hasFullAudit && (
+                    <p style={{ marginTop: 'var(--space-4)', fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-400)' }}>
+                      Some audit details are only available to Advanced users.
+                    </p>
                   )}
                 </div>
-              )}
+              </div>
+            )}
+          </div>
+        )}
 
-              {/* Processing Reports */}
-              {reports.length > 0 && (
-                <div className="reports-section">
-                  <h5>Processing Reports</h5>
-                  {reports.map((report, index) => (
-                    <div key={index} className="report-card">
-                      <div className="report-header">{report.type}</div>
-                      <div className="report-field">
-                        <strong>Summary:</strong> {report.summary}
-                      </div>
-                      <div className="report-field">
-                        <strong>Changes Applied:</strong> {report.changesApplied}
-                      </div>
-                      <div className="report-field">
-                        <strong>Rationale:</strong> {report.rationale}
-                      </div>
-                      <div className="report-field">
-                        <strong>Confidence:</strong> {report.confidence}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {!hasFullAudit && (
-                <p className="role-notice">
-                  Some audit details are only available to Advanced users.
-                </p>
-              )}
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* Deliveries Tab — Component: DeliveryManager */}
-      {activeTab === 'deliveries' && (
-        <section className="deliveries-section">
-          <div className="component-container">
+        {/* Deliveries Tab */}
+        {activeTab === 'deliveries' && (
+          <div className="tabs__panel tabs__panel--active">
             <DeliveryManager
               projectId={projectId || undefined}
             />
           </div>
-        </section>
-      )}
+        )}
+      </section>
     </div>
   );
 }
