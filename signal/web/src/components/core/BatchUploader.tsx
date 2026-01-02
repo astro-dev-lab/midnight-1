@@ -21,7 +21,7 @@ interface BatchUploaderProps {
 }
 
 export const BatchUploader: React.FC<BatchUploaderProps> = ({
-  projectId: _projectId,
+  projectId,
   onUploadComplete,
   maxFileSize = 200 * 1024 * 1024, // 200MB
   acceptedFormats = ['.wav', '.aiff', '.mp3', '.flac', '.m4a'],
@@ -78,7 +78,7 @@ export const BatchUploader: React.FC<BatchUploaderProps> = ({
       ));
 
       // Use the real StudioOS API client
-      const analysisData = await studioOS.uploadAndAnalyze(uploadFile.file);
+      const analysisData = await studioOS.uploadAndAnalyze(uploadFile.file, projectId);
 
       const updatedFile: UploadFile = {
         ...uploadFile,

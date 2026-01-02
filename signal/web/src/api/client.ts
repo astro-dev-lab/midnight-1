@@ -294,9 +294,12 @@ class StudioOSClient {
   // Audio Analysis
   // ===========================================================================
 
-  async uploadAndAnalyze(file: File): Promise<AudioAnalysisResult> {
+  async uploadAndAnalyze(file: File, projectId?: number): Promise<AudioAnalysisResult> {
     const formData = new FormData();
     formData.append('audio', file);
+    if (projectId) {
+      formData.append('projectId', String(projectId));
+    }
     
     const response = await this.client.post<AudioAnalysisResult>('/api/audio/upload-and-analyze', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

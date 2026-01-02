@@ -12,6 +12,7 @@ import type { Asset } from '../../api/types';
 export interface AssetMetadata {
   title?: string;
   artist?: string;
+  category?: 'RAW' | 'DERIVED' | 'FINAL';
   isrc?: string;
   bpm?: number | null;
   key?: string;
@@ -44,6 +45,13 @@ const MUSICAL_KEYS = [
   'C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B'
 ];
 
+// Asset categories per StudioOS specs
+const ASSET_CATEGORIES = [
+  { value: 'RAW', label: 'Raw', description: 'Original source files' },
+  { value: 'DERIVED', label: 'Derived', description: 'Processed/transformed assets' },
+  { value: 'FINAL', label: 'Final', description: 'Deliverables for distribution' }
+] as const;
+
 export const MetadataEditor: React.FC<MetadataEditorProps> = ({
   asset,
   onUpdate,
@@ -54,6 +62,7 @@ export const MetadataEditor: React.FC<MetadataEditorProps> = ({
   const [metadata, setMetadata] = useState<AssetMetadata>({
     title: (asset.metadata?.title as string) || '',
     artist: (asset.metadata?.artist as string) || '',
+    category: (asset.metadata?.category as 'RAW' | 'DERIVED' | 'FINAL') || 'RAW',
     isrc: (asset.metadata?.isrc as string) || '',
     bpm: (asset.metadata?.bpm as number) || null,
     key: (asset.metadata?.key as string) || '',
@@ -163,6 +172,26 @@ export const MetadataEditor: React.FC<MetadataEditorProps> = ({
               disabled={readOnly || isSubmitting}
               required
             />
+          </FormField>
+
+          <FormField
+            label="Asset Category"
+            required
+            error={errors.category}
+            helpText="Classification for workflow processing"
+          >
+            <select
+              value={metadata.category || 'RAW'}
+              onChange={(e) => updateField('category', e.target.value as 'RAW' | 'DERIVED' | 'FINAL')}
+              disabled={readOnly || isSubmitting}
+              required
+            >
+              {ASSET_CATEGORIES.map(cat => (
+                <option key={cat.value} value={cat.value}>
+                  {cat.label} — {cat.description}
+                </option>
+              ))}
+            </select>
           </FormField>
 
           <FormField
