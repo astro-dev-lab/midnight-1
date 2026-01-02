@@ -22,3 +22,4 @@ export { ReviewView } from './ReviewView';
 export { DeliverView } from './DeliverView';
 export { HistoryView } from './HistoryView';
 export { FixIssuesView } from './FixIssuesView';
+export { SettingsView } from './SettingsView';

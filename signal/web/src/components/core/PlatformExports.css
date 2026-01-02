@@ -1,82 +1,92 @@
 .platform-exports {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 2px;
+  background: var(--color-gray-900);
+  border: 1px solid var(--color-gray-800);
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
 }
 
 .exports-header {
-  padding: var(--space-6);
-  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-gray-800);
+  background: var(--color-gray-800);
 }
 
 .exports-header .text-heading {
-  color: var(--color-primary);
-  margin-bottom: var(--space-2);
+  color: var(--color-white);
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
 }
 
 .exports-header .text-caption {
-  color: var(--color-border);
+  color: var(--color-gray-400);
+  font-size: var(--font-size-xs);
+  margin: 0;
 }
 
 .preset-selector {
-  padding: var(--space-4) var(--space-6);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-secondary);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-gray-800);
+  background: var(--color-gray-900);
 }
 
 .preset-options {
   display: flex;
-  gap: var(--space-3);
+  gap: var(--space-2);
   justify-content: center;
+  flex-wrap: wrap;
 }
 
 .preset-option {
-  padding: var(--space-3) var(--space-5);
-  border: 2px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-primary);
-  border-radius: 2px;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-gray-700);
+  background: var(--color-gray-800);
+  color: var(--color-gray-200);
+  border-radius: var(--border-radius);
   cursor: pointer;
-  transition: all 0.2s ease;
-  font-weight: 500;
-  font-size: 0.9rem;
+  transition: all var(--duration-150) var(--ease-out);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-sm);
 }
 
 .preset-option:hover:not(:disabled) {
   border-color: var(--color-primary);
+  color: var(--color-white);
 }
 
 .preset-option.active {
   border-color: var(--color-primary);
   background: var(--color-primary);
-  color: var(--color-secondary);
+  color: var(--color-white);
 }
 
 .preset-option:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .global-metadata {
-  padding: var(--space-6);
-  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-5);
+  border-bottom: 1px solid var(--color-gray-800);
 }
 
 .global-metadata h4 {
-  color: var(--color-primary);
+  color: var(--color-gray-200);
   margin-bottom: var(--space-4);
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wider);
 }
 
 .metadata-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--space-4);
 }
 
 .platform-configs {
-  padding: var(--space-6);
+  padding: var(--space-5);
 }
 
 .configs-header {

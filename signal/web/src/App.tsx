@@ -17,7 +17,8 @@ import {
   TransformView,
   ReviewView,
   DeliverView,
-  HistoryView
+  HistoryView,
+  SettingsView
 } from './views/dashboard-one';
 
 // Dashboard Two Views
@@ -220,6 +221,7 @@ function DashboardOneLayout() {
     { id: 'review', label: 'Review', icon: <NavIcons.Compliance />, path: '/dashboard/review' },
     { id: 'deliver', label: 'Deliver', icon: <NavIcons.Deliver />, path: '/dashboard/deliver' },
     { id: 'history', label: 'History', icon: <NavIcons.History />, path: '/dashboard/history' },
+    { id: 'settings', label: 'Settings', icon: <NavIcons.Account />, path: '/dashboard/settings' },
   ];
 
   const getActiveNavItem = () => {
@@ -284,6 +286,7 @@ function DashboardOneLayout() {
         <Route path="review" element={<ReviewView projectId={selectedProject} role={user?.internalRole || 'BASIC'} onNavigate={handleViewNavigate} />} />
         <Route path="deliver" element={<DeliverView projectId={selectedProject} role={user?.internalRole || 'BASIC'} onNavigate={handleViewNavigate} />} />
         <Route path="history" element={<HistoryView projectId={selectedProject} role={user?.internalRole || 'BASIC'} />} />
+        <Route path="settings" element={<SettingsView user={user || undefined} onLogout={logout} />} />
       </Routes>
     </DashboardLayout>
   );
