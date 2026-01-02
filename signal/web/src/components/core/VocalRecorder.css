@@ -1,0 +1,485 @@
+/**
+ * VocalRecorder Styles
+ * 
+ * Dark, restrained design per StudioOS Dashboard visual language.
+ * No playful controls - this is a professional recording interface.
+ */
+
+.vocal-recorder {
+  background: var(--color-surface, #18181b);
+  border: var(--border-width-1, 1px) solid var(--color-border, #27272a);
+  border-radius: var(--border-radius-lg, 8px);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.recorder-header {
+  padding: var(--space-6, 1.5rem);
+  border-bottom: var(--border-width-1, 1px) solid var(--color-border, #27272a);
+  background: var(--color-surface-subtle, #1f1f23);
+}
+
+.recorder-header .text-heading {
+  color: var(--color-primary, #a855f7);
+  margin-bottom: var(--space-2, 0.5rem);
+  font-size: var(--font-size-xl, 1.25rem);
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+.recorder-header .text-caption {
+  color: var(--color-text-secondary, #a1a1aa);
+  font-size: var(--font-size-sm, 0.875rem);
+}
+
+/* ============================================================================
+ * Error Display
+ * ============================================================================ */
+
+.recorder-error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+  padding: var(--space-4, 1rem);
+  margin: var(--space-4, 1rem);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--border-radius-md, 4px);
+  color: #fca5a5;
+  font-size: 0.9rem;
+}
+
+.error-icon {
+  flex-shrink: 0;
+}
+
+.error-dismiss {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #fca5a5;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 0 var(--space-2, 0.5rem);
+}
+
+.error-dismiss:hover {
+  color: #ef4444;
+}
+
+/* ============================================================================
+ * Permission Request
+ * ============================================================================ */
+
+.permission-request {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8, 2rem);
+  text-align: center;
+  min-height: 200px;
+}
+
+.permission-icon {
+  font-size: 3rem;
+  margin-bottom: var(--space-4, 1rem);
+  opacity: 0.8;
+}
+
+.permission-icon.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.permission-text {
+  color: var(--color-text-secondary, #a1a1aa);
+  margin-bottom: var(--space-6, 1.5rem);
+  font-size: 1rem;
+}
+
+/* ============================================================================
+ * Recording Interface
+ * ============================================================================ */
+
+.recording-interface {
+  padding: var(--space-6, 1.5rem);
+}
+
+/* Device Selector */
+.device-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+  margin-bottom: var(--space-6, 1.5rem);
+}
+
+.device-label {
+  color: var(--color-text-secondary, #a1a1aa);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.device-select {
+  flex: 1;
+  background: var(--color-background, #09090b);
+  border: 1px solid var(--color-border, #27272a);
+  border-radius: var(--border-radius-md, 4px);
+  color: var(--color-text-primary, #e5e5e5);
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  font-size: 0.875rem;
+}
+
+.device-select:focus {
+  outline: none;
+  border-color: var(--color-primary, #a855f7);
+}
+
+/* Level Meter */
+.level-meter-container {
+  margin-bottom: var(--space-6, 1.5rem);
+}
+
+.level-meter {
+  height: 12px;
+  background: var(--color-background, #09090b);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+
+.level-fill {
+  height: 100%;
+  transition: width 50ms ease-out;
+  border-radius: 6px;
+}
+
+.level-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-1, 0.25rem);
+  font-size: 0.7rem;
+  color: var(--color-text-muted, #71717a);
+}
+
+/* Timer Display */
+.timer-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4, 1rem);
+  margin-bottom: var(--space-6, 1.5rem);
+  padding: var(--space-4, 1rem);
+  background: var(--color-background, #09090b);
+  border-radius: var(--border-radius-md, 4px);
+}
+
+.timer-value {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 2.5rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #e5e5e5);
+  letter-spacing: 0.05em;
+}
+
+.timer-display.recording .timer-value {
+  color: var(--color-danger, #ef4444);
+}
+
+.recording-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  color: var(--color-danger, #ef4444);
+  font-size: 0.875rem;
+  font-weight: 600;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Recording Controls */
+.recording-controls {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-4, 1rem);
+  margin-bottom: var(--space-6, 1.5rem);
+}
+
+.btn-record {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-4, 1rem) var(--space-8, 2rem);
+  background: var(--color-danger, #ef4444);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius-md, 4px);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-record:hover {
+  background: #dc2626;
+  transform: scale(1.02);
+}
+
+.btn-record .btn-icon {
+  font-size: 1.2rem;
+}
+
+.btn-stop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-4, 1rem) var(--space-8, 2rem);
+  background: var(--color-surface-subtle, #27272a);
+  color: var(--color-text-primary, #e5e5e5);
+  border: 2px solid var(--color-danger, #ef4444);
+  border-radius: var(--border-radius-md, 4px);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-stop:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.btn-secondary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-3, 0.75rem) var(--space-6, 1.5rem);
+  background: var(--color-surface-subtle, #27272a);
+  color: var(--color-text-primary, #e5e5e5);
+  border: 1px solid var(--color-border, #3f3f46);
+  border-radius: var(--border-radius-md, 4px);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: var(--color-surface, #3f3f46);
+  border-color: var(--color-text-secondary, #a1a1aa);
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-3, 0.75rem) var(--space-6, 1.5rem);
+  background: var(--color-primary, #a855f7);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius-md, 4px);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  background: #9333ea;
+}
+
+/* Recording Info */
+.recording-info {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-6, 1.5rem);
+  padding: var(--space-3, 0.75rem);
+  background: var(--color-surface-subtle, #1f1f23);
+  border-radius: var(--border-radius-md, 4px);
+  font-size: 0.8rem;
+}
+
+.info-item {
+  display: flex;
+  gap: var(--space-2, 0.5rem);
+}
+
+.info-label {
+  color: var(--color-text-muted, #71717a);
+}
+
+.info-value {
+  color: var(--color-text-secondary, #a1a1aa);
+  font-family: var(--font-mono, monospace);
+}
+
+/* ============================================================================
+ * Takes List
+ * ============================================================================ */
+
+.takes-list {
+  border-top: 1px solid var(--color-border, #27272a);
+  padding: var(--space-4, 1rem);
+}
+
+.takes-header {
+  color: var(--color-text-secondary, #a1a1aa);
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: var(--space-3, 0.75rem);
+}
+
+.takes-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+}
+
+.take-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3, 0.75rem);
+  background: var(--color-background, #09090b);
+  border: 1px solid var(--color-border, #27272a);
+  border-radius: var(--border-radius-md, 4px);
+  transition: all 0.2s ease;
+}
+
+.take-item:hover {
+  border-color: var(--color-text-muted, #71717a);
+}
+
+.take-item.selected {
+  border-color: var(--color-primary, #a855f7);
+  background: rgba(168, 85, 247, 0.05);
+}
+
+.take-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4, 1rem);
+}
+
+.take-name {
+  color: var(--color-text-primary, #e5e5e5);
+  font-weight: 500;
+}
+
+.take-duration {
+  color: var(--color-text-muted, #71717a);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85rem;
+}
+
+.take-actions {
+  display: flex;
+  gap: var(--space-2, 0.5rem);
+}
+
+.btn-icon-only {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-subtle, #27272a);
+  border: 1px solid var(--color-border, #3f3f46);
+  border-radius: var(--border-radius-sm, 2px);
+  color: var(--color-text-secondary, #a1a1aa);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-icon-only:hover {
+  background: var(--color-surface, #3f3f46);
+  color: var(--color-text-primary, #e5e5e5);
+}
+
+.btn-icon-only.btn-save:hover {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: var(--color-success, #22c55e);
+  color: var(--color-success, #22c55e);
+}
+
+.btn-icon-only.btn-delete:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: var(--color-danger, #ef4444);
+  color: var(--color-danger, #ef4444);
+}
+
+/* ============================================================================
+ * Browser Notice
+ * ============================================================================ */
+
+.browser-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+  padding: var(--space-4, 1rem);
+  margin: var(--space-4, 1rem);
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: var(--border-radius-md, 4px);
+  color: #93c5fd;
+  font-size: 0.85rem;
+}
+
+.notice-icon {
+  flex-shrink: 0;
+}
+
+/* ============================================================================
+ * Responsive
+ * ============================================================================ */
+
+@media (max-width: 768px) {
+  .recording-interface {
+    padding: var(--space-4, 1rem);
+  }
+
+  .timer-value {
+    font-size: 2rem;
+  }
+
+  .recording-info {
+    flex-wrap: wrap;
+    gap: var(--space-3, 0.75rem);
+  }
+
+  .device-selector {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .device-label {
+    margin-bottom: var(--space-1, 0.25rem);
+  }
+}
+
+@media (max-width: 480px) {
+  .timer-value {
+    font-size: 1.75rem;
+  }
+
+  .btn-record,
+  .btn-stop {
+    padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+    font-size: 0.9rem;
+  }
+
+  .take-item {
+    flex-direction: column;
+    gap: var(--space-2, 0.5rem);
+    align-items: stretch;
+  }
+
+  .take-actions {
+    justify-content: flex-end;
+  }
+}

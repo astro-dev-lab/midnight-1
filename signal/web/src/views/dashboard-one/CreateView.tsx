@@ -12,13 +12,15 @@
  * COMPONENT USAGE:
  * - BatchUploader: Multi-file drag-drop with progress
  *   Does one thing well: drag, drop, upload, confirm
+ * - VocalRecorder: Microphone capture for vocal recording
+ *   Raw capture only - no effects, no processing
  * 
  * ============================================================================
  */
 
 import { useState } from 'react';
 import { studioOS, useProjects } from '../../api';
-import { BatchUploader } from '../../components/core';
+import { BatchUploader, VocalRecorder } from '../../components/core';
 import type { Project } from '../../api';
 
 interface CreateViewProps {
@@ -75,14 +77,29 @@ export function CreateView({ role: _role, onNavigate }: CreateViewProps) {
   };
 
   // ==========================================================================
+  // Recording Completion Handler
+  // ==========================================================================
+
+  const handleRecordingComplete = async (file: File, metadata: { duration: number; sampleRate: number }) => {
+    console.log('Recording complete:', file.name, metadata);
+    // Upload the recorded file via the API
+    try {
+      await studioOS.uploadAndAnalyze(file);
+      setUploadComplete(true);
+    } catch (err) {
+      console.error('Failed to upload recording:', err);
+    }
+  };
+
+  // ==========================================================================
   // Render
   // ==========================================================================
 
   return (
     <div className="create-view">
       <header className="view-header">
-        <h2 className="view-title">Upload Assets</h2>
-        <p className="view-subtitle">Add audio files to your project for processing</p>
+        <h2 className="view-title">Create Assets</h2>
+        <p className="view-subtitle">Upload files or record vocals for your project</p>
       </header>
 
       {/* Create Project Form */}
@@ -143,6 +160,18 @@ export function CreateView({ role: _role, onNavigate }: CreateViewProps) {
             maxFileSize={500 * 1024 * 1024}
             acceptedFormats={['.wav', '.mp3', '.aiff', '.flac', '.ogg']}
             maxFiles={50}
+          />
+        </div>
+      </section>
+
+      {/* Record Vocals Section — Component: VocalRecorder */}
+      <section className="create-section record-section">
+        <h3 className="section-title">Record Vocals</h3>
+        <div className="component-container">
+          <VocalRecorder
+            onRecordingComplete={handleRecordingComplete}
+            maxDuration={600}
+            sampleRate={48000}
           />
         </div>
       </section>

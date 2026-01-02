@@ -9,7 +9,7 @@ import type { NavItem } from './components/layout';
 import type { AuditEntry, Version } from './components/ui';
 import './App.css';
 
-// Dashboard One Views
+// Dashboard One Views - exactly 7 per STUDIOOS_FUNCTIONAL_SPECS.md
 import {
   OverviewView,
   AssetsView,
@@ -17,8 +17,7 @@ import {
   TransformView,
   ReviewView,
   DeliverView,
-  HistoryView,
-  FixIssuesView
+  HistoryView
 } from './views/dashboard-one';
 
 // Dashboard Two Views
@@ -212,21 +211,21 @@ function DashboardOneLayout() {
   const location = useLocation();
   const [selectedProject, setSelectedProject] = useState<number | undefined>(undefined);
 
-  // Dashboard One navigation items (functional domains)
+  // Dashboard One navigation items - exactly 7 views per STUDIOOS_FUNCTIONAL_SPECS.md
   const navItems: NavItem[] = [
-    { id: 'projects', label: 'Projects', icon: <NavIcons.Projects />, path: '/dashboard' },
-    { id: 'uploads', label: 'Uploads', icon: <NavIcons.Uploads />, path: '/dashboard/assets' },
-    { id: 'analysis', label: 'Analysis', icon: <NavIcons.Analysis />, path: '/dashboard/transform' },
-    { id: 'fix-issues', label: 'Fix Issues', icon: <NavIcons.Compliance />, path: '/dashboard/fix-issues' },
-    { id: 'audit', label: 'Audit Trail', icon: <NavIcons.AuditTrail />, path: '/dashboard/history' },
-    { id: 'compliance', label: 'Compliance', icon: <NavIcons.Compliance />, path: '/dashboard/review' },
+    { id: 'overview', label: 'Overview', icon: <NavIcons.Projects />, path: '/dashboard' },
+    { id: 'assets', label: 'Assets', icon: <NavIcons.AuditTrail />, path: '/dashboard/assets' },
+    { id: 'create', label: 'Create', icon: <NavIcons.Uploads />, path: '/dashboard/create' },
+    { id: 'transform', label: 'Transform', icon: <NavIcons.Analysis />, path: '/dashboard/transform' },
+    { id: 'review', label: 'Review', icon: <NavIcons.Compliance />, path: '/dashboard/review' },
     { id: 'deliver', label: 'Deliver', icon: <NavIcons.Deliver />, path: '/dashboard/deliver' },
+    { id: 'history', label: 'History', icon: <NavIcons.History />, path: '/dashboard/history' },
   ];
 
   const getActiveNavItem = () => {
     const path = location.pathname;
     const item = navItems.find(i => i.path === path);
-    return item?.id || 'projects';
+    return item?.id || 'overview';
   };
 
   const handleNavigate = (item: NavItem) => {
@@ -282,7 +281,6 @@ function DashboardOneLayout() {
         <Route path="assets" element={<AssetsView projectId={selectedProject} role={user?.internalRole || 'BASIC'} onNavigate={handleViewNavigate} />} />
         <Route path="create" element={<CreateView role={user?.internalRole || 'BASIC'} onNavigate={handleViewNavigate} />} />
         <Route path="transform" element={<TransformView projectId={selectedProject} role={user?.internalRole || 'BASIC'} onNavigate={handleViewNavigate} />} />
-        <Route path="fix-issues" element={<FixIssuesView projectId={selectedProject} role={user?.internalRole || 'BASIC'} onNavigate={handleViewNavigate} />} />
         <Route path="review" element={<ReviewView projectId={selectedProject} role={user?.internalRole || 'BASIC'} onNavigate={handleViewNavigate} />} />
         <Route path="deliver" element={<DeliverView projectId={selectedProject} role={user?.internalRole || 'BASIC'} onNavigate={handleViewNavigate} />} />
         <Route path="history" element={<HistoryView projectId={selectedProject} role={user?.internalRole || 'BASIC'} />} />

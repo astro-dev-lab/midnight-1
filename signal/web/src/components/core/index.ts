@@ -5,6 +5,7 @@ export { AudioComparison } from '../AudioComparison';
 export { MetadataEditor } from './MetadataEditor';
 export type { AssetMetadata } from './MetadataEditor';
 export { BatchUploader } from './BatchUploader';
+export { VocalRecorder } from './VocalRecorder';
 export { QualityPresets } from './QualityPresets';
 export { ProcessingReport } from './ProcessingReport';
 export { JobManager } from './JobManager';
