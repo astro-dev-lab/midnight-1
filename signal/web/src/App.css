@@ -4,6 +4,7 @@
  */
 
 @import './styles/design-system.css';
+@import './styles/views.css';
 
 #root {
   width: 100%;

@@ -40,97 +40,120 @@ export function OverviewView({ role: _role, onNavigate }: OverviewViewProps) {
   };
 
   if (loading) {
-    return <div className="view-loading">Loading overview...</div>;
+    return <div className="loading">Loading overview...</div>;
   }
 
   if (error) {
-    return <div className="view-error">{error}</div>;
+    return <div className="error-message">{error}</div>;
   }
 
   const activeProjects = projects.filter(p => p.state === 'PROCESSING');
   const readyProjects = projects.filter(p => p.state === 'READY');
   const recentProjects = projects.slice(0, 5);
 
+  const getStateBadgeClass = (state: Project['state']) => {
+    switch (state) {
+      case 'DRAFT': return 'badge badge--state-draft';
+      case 'PROCESSING': return 'badge badge--state-processing';
+      case 'READY': return 'badge badge--state-ready';
+      case 'DELIVERED': return 'badge badge--state-delivered';
+      default: return 'badge badge--neutral';
+    }
+  };
+
   return (
-    <div className="overview-view">
-      <header className="view-header">
-        <h2 className="view-title">Overview</h2>
-        <p className="view-subtitle">Current status of your production workspace</p>
+    <div className="view">
+      {/* Header */}
+      <header className="view__header">
+        <h2 className="view__title">Overview</h2>
+        <p className="view__subtitle">Current status of your production workspace</p>
       </header>
       
-      {/* Status Summary — Artist: "what's the quick picture?" */}
-      <section className="status-summary">
-        <div className="stat-card">
-          <span className="stat-value">{projects.length}</span>
-          <span className="stat-label">Total Projects</span>
-        </div>
-        <div className="stat-card processing">
-          <span className="stat-value">{activeProjects.length}</span>
-          <span className="stat-label">Processing</span>
-        </div>
-        <div className="stat-card ready">
-          <span className="stat-value">{readyProjects.length}</span>
-          <span className="stat-label">Ready for Review</span>
-        </div>
-      </section>
-
-      {/* Quick Actions — Artist: fast paths to common tasks */}
-      <section className="quick-actions">
-        <h3 className="section-title">Quick Actions</h3>
-        <div className="action-buttons">
-          <button className="action-btn" onClick={() => onNavigate('create')}>
-            <span className="action-icon">📁</span>
-            <span className="action-label">Upload Assets</span>
-          </button>
-          <button className="action-btn" onClick={() => onNavigate('transform')}>
-            <span className="action-icon">⚙️</span>
-            <span className="action-label">Start Processing</span>
-          </button>
-          <button className="action-btn" onClick={() => onNavigate('deliver')}>
-            <span className="action-icon">📤</span>
-            <span className="action-label">Prepare Delivery</span>
-          </button>
+      {/* Status Summary */}
+      <section className="section">
+        <div className="stats-grid">
+          <div className="stat-card">
+            <span className="stat-card__value">{projects.length}</span>
+            <span className="stat-card__label">Total Projects</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-card__value stat-card__value--primary">{activeProjects.length}</span>
+            <span className="stat-card__label">Processing</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-card__value stat-card__value--success">{readyProjects.length}</span>
+            <span className="stat-card__label">Ready for Review</span>
+          </div>
         </div>
       </section>
 
-      {/* Job Activity — Primary component: JobManager */}
-      <section className="job-activity">
-        <h3 className="section-title">Job Activity</h3>
-        <div className="component-container">
-          <JobManager />
+      {/* Quick Actions */}
+      <section className="section">
+        <h3 className="section__title">Quick Actions</h3>
+        <div className="actions-grid">
+          <button className="action-card" onClick={() => onNavigate('create')}>
+            <span className="action-card__icon">📁</span>
+            <span className="action-card__content">
+              <span className="action-card__label">Upload Assets</span>
+              <span className="action-card__description">Add new audio files</span>
+            </span>
+          </button>
+          <button className="action-card" onClick={() => onNavigate('transform')}>
+            <span className="action-card__icon">⚙️</span>
+            <span className="action-card__content">
+              <span className="action-card__label">Start Processing</span>
+              <span className="action-card__description">Run transformations</span>
+            </span>
+          </button>
+          <button className="action-card" onClick={() => onNavigate('deliver')}>
+            <span className="action-card__icon">📤</span>
+            <span className="action-card__content">
+              <span className="action-card__label">Prepare Delivery</span>
+              <span className="action-card__description">Export final outputs</span>
+            </span>
+          </button>
         </div>
       </section>
 
-      {/* Recent Projects — Quick reference list */}
-      <section className="recent-projects">
-        <h3 className="section-title">Recent Projects</h3>
+      {/* Job Activity */}
+      <section className="section">
+        <h3 className="section__title">Job Activity</h3>
+        <JobManager />
+      </section>
+
+      {/* Recent Projects */}
+      <section className="section">
+        <h3 className="section__title">Recent Projects</h3>
         {recentProjects.length === 0 ? (
-          <p className="empty-message">No projects yet. Upload assets to create your first project.</p>
+          <div className="empty-state">
+            <span className="empty-state__icon">📁</span>
+            <p className="empty-state__title">No projects yet</p>
+            <p className="empty-state__description">Upload assets to create your first project.</p>
+          </div>
         ) : (
-          <div className="project-table">
-            <div className="table-header">
+          <div className="card">
+            <div className="table-header" style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr' }}>
               <span>Name</span>
               <span>State</span>
               <span>Assets</span>
               <span>Jobs</span>
               <span>Updated</span>
             </div>
-            {recentProjects.map(project => (
-              <div key={project.id} className="table-row">
-                <span className="project-name">{project.name}</span>
-                <span>
-                  <span 
-                    className="state-badge" 
-                    style={{ backgroundColor: getStateColor(project.state) }}
-                  >
-                    {project.state}
+            <div className="table-rows">
+              {recentProjects.map(project => (
+                <div key={project.id} className="table-row" style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr' }}>
+                  <span style={{ color: 'var(--color-white)', fontWeight: 500 }}>{project.name}</span>
+                  <span>
+                    <span className={getStateBadgeClass(project.state)}>
+                      {project.state}
+                    </span>
                   </span>
-                </span>
-                <span>{project._count?.assets ?? 0}</span>
-                <span>{project._count?.jobs ?? 0}</span>
-                <span>{new Date(project.updatedAt).toLocaleDateString()}</span>
-              </div>
-            ))}
+                  <span>{project._count?.assets ?? 0}</span>
+                  <span>{project._count?.jobs ?? 0}</span>
+                  <span>{new Date(project.updatedAt).toLocaleDateString()}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </section>
