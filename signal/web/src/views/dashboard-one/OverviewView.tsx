@@ -29,16 +29,6 @@ export function OverviewView({ role: _role, onNavigate }: OverviewViewProps) {
   const { data: projectsResponse, loading, error } = useProjects();
   const projects = projectsResponse?.data || [];
 
-  const getStateColor = (state: Project['state']) => {
-    switch (state) {
-      case 'DRAFT': return '#6c757d';
-      case 'PROCESSING': return '#007bff';
-      case 'READY': return '#28a745';
-      case 'DELIVERED': return '#17a2b8';
-      default: return '#6c757d';
-    }
-  };
-
   if (loading) {
     return <div className="loading">Loading overview...</div>;
   }

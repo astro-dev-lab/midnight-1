@@ -54,12 +54,12 @@ export function AssetsView({ projectId, role: _role, onNavigate }: AssetsViewPro
     }
   }, [projects, selectedProjectId]);
 
-  const getCategoryColor = (category: Asset['category']) => {
+  const getCategoryBadgeClass = (category: Asset['category']) => {
     switch (category) {
-      case 'RAW': return '#6c757d';
-      case 'DERIVED': return '#ffc107';
-      case 'FINAL': return '#28a745';
-      default: return '#6c757d';
+      case 'RAW': return 'badge badge--neutral';
+      case 'DERIVED': return 'badge badge--warning';
+      case 'FINAL': return 'badge badge--success';
+      default: return 'badge badge--neutral';
     }
   };
 
@@ -84,18 +84,19 @@ export function AssetsView({ projectId, role: _role, onNavigate }: AssetsViewPro
   };
 
   if (loading && projects.length === 0) {
-    return <div className="view-loading">Loading assets...</div>;
+    return <div className="loading">Loading assets...</div>;
   }
 
   return (
-    <div className="assets-view">
-      <header className="view-header">
-        <h2 className="view-title">Assets</h2>
-        <p className="view-subtitle">Browse and manage your audio files</p>
+    <div className="view">
+      {/* Header */}
+      <header className="view__header">
+        <h2 className="view__title">Assets</h2>
+        <p className="view__subtitle">Browse and manage your audio files</p>
       </header>
 
-      {/* Search — Component: SmartSearch */}
-      <section className="search-section">
+      {/* Search */}
+      <section className="section">
         <SmartSearch
           onSelect={handleSearchSelect}
           placeholder="Search assets by name, artist, or metadata..."
@@ -103,63 +104,73 @@ export function AssetsView({ projectId, role: _role, onNavigate }: AssetsViewPro
       </section>
 
       {/* Controls */}
-      <section className="controls-section">
-        <select 
-          value={selectedProjectId || ''} 
-          onChange={(e) => {
-            setSelectedProjectId(parseInt(e.target.value));
-            setSelectedAsset(null);
-          }}
-          className="project-select"
-        >
-          <option value="">Select Project</option>
-          {projects.map(p => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
+      <section className="section">
+        <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+          <select 
+            value={selectedProjectId || ''} 
+            onChange={(e) => {
+              setSelectedProjectId(parseInt(e.target.value));
+              setSelectedAsset(null);
+            }}
+            className="form-select"
+            style={{ minWidth: '200px' }}
+          >
+            <option value="">Select Project</option>
+            {projects.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
 
-        <select 
-          value={categoryFilter} 
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="category-filter"
-        >
-          <option value="">All Categories</option>
-          <option value="RAW">Raw</option>
-          <option value="DERIVED">Derived</option>
-          <option value="FINAL">Final</option>
-        </select>
+          <select 
+            value={categoryFilter} 
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="form-select"
+            style={{ minWidth: '150px' }}
+          >
+            <option value="">All Categories</option>
+            <option value="RAW">Raw</option>
+            <option value="DERIVED">Derived</option>
+            <option value="FINAL">Final</option>
+          </select>
 
-        <button onClick={() => onNavigate('create')} className="btn-upload">
-          Upload Asset
-        </button>
+          <button onClick={() => onNavigate('create')} className="btn btn--primary">
+            Upload Asset
+          </button>
+        </div>
       </section>
 
-      <div className="assets-layout">
+      <div className="layout-sidebar">
         {/* Asset List */}
-        <section className="asset-list-section">
-          <h3 className="section-title">Assets ({assets.length})</h3>
+        <section className="section">
+          <h3 className="section__title">Assets ({assets.length})</h3>
           {assets.length === 0 ? (
-            <p className="empty-message">No assets found. Upload assets to get started.</p>
+            <div className="empty-state">
+              <span className="empty-state__icon">🎵</span>
+              <p className="empty-state__title">No assets found</p>
+              <p className="empty-state__description">Upload assets to get started.</p>
+            </div>
           ) : (
-            <div className="asset-grid">
+            <div className="cards-grid">
               {assets.map((asset: Asset) => (
                 <button
                   key={asset.id}
-                  className={`asset-card ${selectedAsset?.id === asset.id ? 'selected' : ''}`}
+                  className={`card card--interactive ${selectedAsset?.id === asset.id ? 'card--selected' : ''}`}
                   onClick={() => setSelectedAsset(asset)}
+                  style={{ textAlign: 'left', border: 'none', background: 'var(--color-gray-900)' }}
                 >
-                  <span className="asset-icon">🎵</span>
-                  <div className="asset-info">
-                    <span className="asset-name">{asset.name}</span>
-                    <span 
-                      className="category-badge" 
-                      style={{ backgroundColor: getCategoryColor(asset.category) }}
-                    >
-                      {asset.category}
-                    </span>
-                    <span className="asset-meta">
-                      {asset.mimeType} • {formatSize(asset.sizeBytes)}
-                    </span>
+                  <div className="card__body" style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '1.5rem' }}>🎵</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 500, color: 'var(--color-white)', marginBottom: 'var(--space-2)' }}>
+                        {asset.name}
+                      </div>
+                      <span className={getCategoryBadgeClass(asset.category)}>
+                        {asset.category}
+                      </span>
+                      <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-gray-400)', marginTop: 'var(--space-2)' }}>
+                        {asset.mimeType} • {formatSize(asset.sizeBytes)}
+                      </div>
+                    </div>
                   </div>
                 </button>
               ))}
@@ -167,10 +178,10 @@ export function AssetsView({ projectId, role: _role, onNavigate }: AssetsViewPro
           )}
         </section>
 
-        {/* Metadata Editor — Component: MetadataEditor */}
+        {/* Metadata Editor */}
         {selectedAsset && (
-          <section className="metadata-section">
-            <h3 className="section-title">Metadata</h3>
+          <section className="section">
+            <h3 className="section__title">Metadata</h3>
             <MetadataEditor
               asset={selectedAsset}
               onUpdate={handleMetadataUpdate}
@@ -181,25 +192,29 @@ export function AssetsView({ projectId, role: _role, onNavigate }: AssetsViewPro
       </div>
 
       {/* Lineage Info */}
-      <section className="lineage-info">
-        <h3 className="section-title">Asset Lineage</h3>
-        <p>
-          Assets flow through categories: <strong>Raw → Derived → Final</strong>
-        </p>
-        <div className="lineage-stages">
-          <div className="stage">
-            <span className="stage-badge raw">RAW</span>
-            <span>Original uploaded assets</span>
-          </div>
-          <span className="arrow">→</span>
-          <div className="stage">
-            <span className="stage-badge derived">DERIVED</span>
-            <span>Outputs from processing</span>
-          </div>
-          <span className="arrow">→</span>
-          <div className="stage">
-            <span className="stage-badge final">FINAL</span>
-            <span>Approved for delivery</span>
+      <section className="section section--bordered">
+        <h3 className="section__title">Asset Lineage</h3>
+        <div className="card">
+          <div className="card__body">
+            <p style={{ color: 'var(--color-gray-300)', marginBottom: 'var(--space-4)' }}>
+              Assets flow through categories: <strong style={{ color: 'var(--color-white)' }}>Raw → Derived → Final</strong>
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <span className="badge badge--neutral">RAW</span>
+                <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-400)' }}>Original uploaded</span>
+              </div>
+              <span style={{ color: 'var(--color-gray-600)' }}>→</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <span className="badge badge--warning">DERIVED</span>
+                <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-400)' }}>From processing</span>
+              </div>
+              <span style={{ color: 'var(--color-gray-600)' }}>→</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <span className="badge badge--success">FINAL</span>
+                <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-400)' }}>Ready for delivery</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
