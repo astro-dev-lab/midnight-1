@@ -241,11 +241,15 @@ export const BatchUploader: React.FC<BatchUploaderProps> = ({
                     <span className="size">{formatFileSize(file.file.size)}</span>
                     {file.analysisResults && (
                       <>
+                        <span className="format-badge">
+                          {file.analysisResults.format || 'N/A'}
+                        </span>
                         <span className="duration">
                           {formatDuration(file.analysisResults.duration)}
                         </span>
                         <span className="quality">
                           {file.analysisResults.sampleRate / 1000}kHz
+                          {file.analysisResults.bitDepth && `/${file.analysisResults.bitDepth}bit`}
                         </span>
                         <span className="loudness">
                           {file.analysisResults.loudness.toFixed(1)} LUFS
@@ -254,6 +258,34 @@ export const BatchUploader: React.FC<BatchUploaderProps> = ({
                     )}
                   </div>
                 </div>
+
+                {/* Format Normalization Info */}
+                {file.analysisResults?.normalization?.required && (
+                  <div className="normalization-info">
+                    <div className="normalization-header">
+                      <span className="normalization-icon">🔄</span>
+                      <span className="normalization-label">Format Normalization Required</span>
+                    </div>
+                    <div className="normalization-actions">
+                      {file.analysisResults.normalization.actions.map((action, idx) => (
+                        <span key={idx} className="normalization-action">{action}</span>
+                      ))}
+                    </div>
+                    <div className="normalization-target">
+                      Target: {file.analysisResults.normalization.target.format} {' '}
+                      {file.analysisResults.normalization.target.sampleRate / 1000}kHz / {' '}
+                      {file.analysisResults.normalization.target.bitDepth}-bit
+                    </div>
+                  </div>
+                )}
+
+                {/* No normalization needed badge */}
+                {file.analysisResults?.normalization && !file.analysisResults.normalization.required && (
+                  <div className="normalization-info normalization-ok">
+                    <span className="normalization-icon">✓</span>
+                    <span className="normalization-label">Format ready for processing</span>
+                  </div>
+                )}
 
                 {file.status === 'uploading' && (
                   <div className="progress-bar">

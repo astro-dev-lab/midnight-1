@@ -59,16 +59,59 @@ router.post('/upload-and-analyze', upload.single('audio'), async (req, res) => {
     // Cleanup uploaded file
     await fs.unlink(filePath);
 
+    // Extract nested analysis data
+    const info = basicAnalysis.info || {};
+    const loudnessData = basicAnalysis.loudness || {};
+
+    // Determine format normalization requirements
+    const ext = path.extname(originalName).toLowerCase();
+    const formatInfo = {
+      originalFormat: ext.replace('.', '').toUpperCase(),
+      codec: info.codec || 'unknown',
+      bitDepth: info.bitDepth || null,
+      sampleRate: info.sampleRate || 0,
+      channels: info.channels || 0
+    };
+
+    // Check if format needs normalization for processing
+    // StudioOS normalizes to WAV 48kHz/24-bit for internal processing
+    const targetFormat = { format: 'WAV', sampleRate: 48000, bitDepth: 24 };
+    const needsNormalization = 
+      formatInfo.originalFormat !== 'WAV' ||
+      formatInfo.sampleRate !== targetFormat.sampleRate ||
+      (formatInfo.bitDepth && formatInfo.bitDepth !== targetFormat.bitDepth);
+
+    const normalization = {
+      required: needsNormalization,
+      original: formatInfo,
+      target: targetFormat,
+      actions: []
+    };
+
+    if (formatInfo.originalFormat !== 'WAV') {
+      normalization.actions.push(`Convert ${formatInfo.originalFormat} → WAV`);
+    }
+    if (formatInfo.sampleRate && formatInfo.sampleRate !== targetFormat.sampleRate) {
+      normalization.actions.push(`Resample ${formatInfo.sampleRate / 1000}kHz → ${targetFormat.sampleRate / 1000}kHz`);
+    }
+    if (formatInfo.bitDepth && formatInfo.bitDepth !== targetFormat.bitDepth) {
+      normalization.actions.push(`Convert ${formatInfo.bitDepth}-bit → ${targetFormat.bitDepth}-bit`);
+    }
+
     // Return comprehensive analysis
     res.json({
       filename: originalName,
-      duration: basicAnalysis.duration,
-      bitrate: basicAnalysis.bitrate,
-      sampleRate: basicAnalysis.sampleRate,
-      channels: basicAnalysis.channels,
-      loudness: basicAnalysis.loudness,
-      truePeak: basicAnalysis.truePeak,
-      lra: basicAnalysis.lra,
+      duration: info.duration || 0,
+      bitrate: info.bitRate || 0,
+      sampleRate: info.sampleRate || 0,
+      channels: info.channels || 0,
+      loudness: loudnessData.integratedLoudness || 0,
+      truePeak: loudnessData.truePeak || 0,
+      lra: loudnessData.loudnessRange || 0,
+      format: formatInfo.originalFormat,
+      codec: formatInfo.codec,
+      bitDepth: formatInfo.bitDepth,
+      normalization: normalization,
       spectrum: spectrumData,
       stereoWidth: stereoWidth,
       phaseCorrelation: phaseCorrelation,

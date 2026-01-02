@@ -212,6 +212,77 @@
   margin-bottom: 0;
 }
 
+/* ============================================================================
+ * Format Normalization Display
+ * Per STUDIOOS_FUNCTIONAL_SPECS.md - Create section: Normalize incoming formats
+ * ============================================================================ */
+
+.normalization-info {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: var(--border-radius-md, 4px);
+  padding: var(--space-3);
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.normalization-info.normalization-ok {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.normalization-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.normalization-icon {
+  font-size: 1rem;
+}
+
+.normalization-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-text-primary, #e5e5e5);
+}
+
+.normalization-ok .normalization-label {
+  color: var(--color-success, #22c55e);
+}
+
+.normalization-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.normalization-action {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-family: var(--font-mono, monospace);
+}
+
+.normalization-target {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #a1a1aa);
+}
+
+.format-badge {
+  background: var(--color-surface-subtle, #27272a);
+  color: var(--color-text-primary, #e5e5e5);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
 .remove-file {
   position: absolute;
   top: var(--space-2);

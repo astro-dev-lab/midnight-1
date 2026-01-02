@@ -307,11 +307,33 @@ export interface AudioAnalysisResult {
   loudness: number;
   truePeak: number;
   lra: number;
+  format?: string;
+  codec?: string;
+  bitDepth?: number | null;
+  normalization?: FormatNormalization;
   spectrum?: SpectrumData;
   stereoWidth?: number;
   phaseCorrelation?: number;
   problems?: AudioProblem[];
   timestamp: string;
+}
+
+/** Format normalization info per STUDIOOS_FUNCTIONAL_SPECS.md Create section */
+export interface FormatNormalization {
+  required: boolean;
+  original: {
+    originalFormat: string;
+    codec: string;
+    bitDepth: number | null;
+    sampleRate: number;
+    channels: number;
+  };
+  target: {
+    format: string;
+    sampleRate: number;
+    bitDepth: number;
+  };
+  actions: string[];
 }
 
 export interface SpectrumData {
