@@ -144,11 +144,11 @@ describe('Storage Service', () => {
   });
 
   describe('Presigned URLs', () => {
-    it('should generate valid presigned URLs', () => {
+    it('should generate valid presigned URLs', async () => {
       const fileKey = '1/abc/test.wav';
       const baseUrl = 'https://api.example.com';
       
-      const { url, expiresAt } = generatePresignedUrl(fileKey, baseUrl);
+      const { url, expiresAt } = await generatePresignedUrl(fileKey, baseUrl);
       
       expect(url).toContain(baseUrl);
       expect(url).toContain('key=');
@@ -158,11 +158,11 @@ describe('Storage Service', () => {
       expect(expiresAt.getTime()).toBeGreaterThan(Date.now());
     });
 
-    it('should verify valid presigned URLs', () => {
+    it('should verify valid presigned URLs', async () => {
       const fileKey = '1/abc/test.wav';
       const baseUrl = 'https://api.example.com';
       
-      const { url } = generatePresignedUrl(fileKey, baseUrl, 3600);
+      const { url } = await generatePresignedUrl(fileKey, baseUrl, 3600);
       
       // Extract params from URL
       const urlObj = new URL(url);
@@ -199,11 +199,11 @@ describe('Storage Service', () => {
       expect(result.reason).toBe('Invalid signature');
     });
 
-    it('should use custom expiration', () => {
+    it('should use custom expiration', async () => {
       const fileKey = '1/abc/test.wav';
       const baseUrl = 'https://api.example.com';
       
-      const { expiresAt } = generatePresignedUrl(fileKey, baseUrl, 60); // 60 seconds
+      const { expiresAt } = await generatePresignedUrl(fileKey, baseUrl, 60); // 60 seconds
       
       const expectedExpiry = Date.now() + 60 * 1000;
       expect(Math.abs(expiresAt.getTime() - expectedExpiry)).toBeLessThan(2000);

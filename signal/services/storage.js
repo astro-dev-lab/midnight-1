@@ -29,9 +29,21 @@ function uuidv4() {
 }
 
 // Configuration
+const STORAGE_PROVIDER = process.env.STORAGE_PROVIDER || 'local';
 const STORAGE_DIR = process.env.STORAGE_DIR || path.join(__dirname, '..', 'storage', 'assets');
 const SIGNED_URL_SECRET = process.env.SIGNED_URL_SECRET || 'dev-secret-change-in-production';
 const SIGNED_URL_EXPIRY = parseInt(process.env.SIGNED_URL_EXPIRY || '3600', 10); // 1 hour default
+
+// Optional S3 client (only used when STORAGE_PROVIDER === 's3')
+let s3Client = null;
+if (STORAGE_PROVIDER === 's3') {
+  try {
+    s3Client = require('./s3Client');
+  } catch (err) {
+    console.warn('[storage] STORAGE_PROVIDER=s3 but s3Client failed to load:', err.message);
+    s3Client = null;
+  }
+}
 
 // Allowed MIME types for audio assets
 const ALLOWED_MIME_TYPES = [
@@ -100,6 +112,14 @@ function getFilePath(fileKey) {
  * @returns {Promise<{ fileKey: string, sizeBytes: number }>}
  */
 async function storeFile(fileKey, buffer) {
+  // S3-backed storage
+  if (STORAGE_PROVIDER === 's3' && s3Client) {
+    const sizeBytes = buffer.length;
+    await s3Client.uploadBuffer(fileKey, buffer, { ContentType: 'application/octet-stream' });
+    return { fileKey, sizeBytes };
+  }
+
+  // Local filesystem
   ensureStorageDir();
   
   const filePath = getFilePath(fileKey);
@@ -131,6 +151,37 @@ async function storeFile(fileKey, buffer) {
  * @returns {Promise<{ fileKey: string, sizeBytes: number }>}
  */
 async function storeFileStream(fileKey, stream) {
+  // S3-backed storage: collect stream into buffer then upload (acceptable for moderate sizes)
+  if (STORAGE_PROVIDER === 's3' && s3Client) {
+    return new Promise((resolve, reject) => {
+      const chunks = [];
+      let sizeBytes = 0;
+
+      stream.on('data', (chunk) => {
+        sizeBytes += chunk.length;
+        if (sizeBytes > MAX_FILE_SIZE) {
+          reject(new Error(`File size exceeds maximum of ${MAX_FILE_SIZE} bytes`));
+          stream.destroy();
+          return;
+        }
+        chunks.push(chunk);
+      });
+
+      stream.on('end', async () => {
+        try {
+          const buffer = Buffer.concat(chunks);
+          await s3Client.uploadBuffer(fileKey, buffer, { ContentType: 'application/octet-stream' });
+          resolve({ fileKey, sizeBytes });
+        } catch (err) {
+          reject(new Error(`Failed to store file to S3: ${err.message}`));
+        }
+      });
+
+      stream.on('error', (err) => reject(new Error(`Stream error: ${err.message}`)));
+    });
+  }
+
+  // Local filesystem
   ensureStorageDir();
   
   const filePath = getFilePath(fileKey);
@@ -172,6 +223,18 @@ async function storeFileStream(fileKey, stream) {
  * @returns {Promise<Buffer>}
  */
 async function getFile(fileKey) {
+  // S3-backed
+  if (STORAGE_PROVIDER === 's3' && s3Client) {
+    const stream = await s3Client.getObjectStream(fileKey);
+    return new Promise((resolve, reject) => {
+      const chunks = [];
+      let length = 0;
+      stream.on('data', (chunk) => { chunks.push(chunk); length += chunk.length; });
+      stream.on('end', () => resolve(Buffer.concat(chunks, length)));
+      stream.on('error', (err) => reject(new Error(`Failed to read file from S3: ${err.message}`)));
+    });
+  }
+
   const filePath = getFilePath(fileKey);
   
   return new Promise((resolve, reject) => {
@@ -195,6 +258,11 @@ async function getFile(fileKey) {
  * @returns {import('fs').ReadStream}
  */
 function getFileStream(fileKey) {
+  if (STORAGE_PROVIDER === 's3' && s3Client) {
+    // Return the S3 object stream directly
+    return s3Client.getObjectStream(fileKey);
+  }
+
   const filePath = getFilePath(fileKey);
   
   if (!fs.existsSync(filePath)) {
@@ -210,6 +278,11 @@ function getFileStream(fileKey) {
  * @returns {Promise<void>}
  */
 async function deleteFile(fileKey) {
+  if (STORAGE_PROVIDER === 's3' && s3Client) {
+    await s3Client.deleteObject(fileKey);
+    return;
+  }
+
   const filePath = getFilePath(fileKey);
   
   return new Promise((resolve, reject) => {
@@ -229,6 +302,10 @@ async function deleteFile(fileKey) {
  * @returns {Promise<boolean>}
  */
 async function fileExists(fileKey) {
+  if (STORAGE_PROVIDER === 's3' && s3Client) {
+    const res = await s3Client.headObjectExists(fileKey);
+    return Boolean(res && res.exists);
+  }
   const filePath = getFilePath(fileKey);
   return fs.existsSync(filePath);
 }
@@ -239,6 +316,15 @@ async function fileExists(fileKey) {
  * @returns {Promise<{ sizeBytes: number, createdAt: Date } | null>}
  */
 async function getFileMetadata(fileKey) {
+  if (STORAGE_PROVIDER === 's3' && s3Client) {
+    const res = await s3Client.headObjectExists(fileKey);
+    if (!res || !res.exists) return null;
+    return {
+      sizeBytes: Number(res.contentLength || 0),
+      createdAt: res.lastModified || null
+    };
+  }
+
   const filePath = getFilePath(fileKey);
   
   return new Promise((resolve) => {
@@ -278,7 +364,14 @@ function generateSignature(payload) {
  * @param {number} [expiresIn] - Seconds until expiry (default: SIGNED_URL_EXPIRY)
  * @returns {{ url: string, expiresAt: Date }}
  */
-function generatePresignedUrl(fileKey, baseUrl, expiresIn = SIGNED_URL_EXPIRY) {
+async function generatePresignedUrl(fileKey, baseUrl, expiresIn = SIGNED_URL_EXPIRY) {
+  // If using S3, generate S3 presigned URL directly
+  if (STORAGE_PROVIDER === 's3' && s3Client) {
+    const url = await s3Client.generatePresignedUrlForGet(fileKey, expiresIn);
+    const expiresAt = new Date((Math.floor(Date.now() / 1000) + expiresIn) * 1000);
+    return { url, expiresAt };
+  }
+
   const expiresAt = Math.floor(Date.now() / 1000) + expiresIn;
   const payload = `${fileKey}:${expiresAt}`;
   const signature = generateSignature(payload);

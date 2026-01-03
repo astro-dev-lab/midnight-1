@@ -643,7 +643,9 @@ function createAssetRoutes(prisma) {
       const host = req.get('host');
       const baseUrl = `${protocol}://${host}`;
       
-      const { url, expiresAt } = generatePresignedUrl(asset.fileKey, baseUrl);
+      const presigned = await generatePresignedUrl(asset.fileKey, baseUrl);
+      const url = presigned.url;
+      const expiresAt = presigned.expiresAt;
 
       res.json({
         url,
