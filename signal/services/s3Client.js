@@ -1,5 +1,6 @@
 const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+const { Upload } = require('@aws-sdk/lib-storage');
 
 const S3_ENDPOINT = process.env.S3_ENDPOINT || undefined;
 const S3_REGION = process.env.S3_REGION || undefined;
@@ -90,6 +91,28 @@ async function deleteObject(key) {
   if (!S3_BUCKET) throw new Error('S3_BUCKET not configured');
   const cmd = new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: key });
   await s3.send(cmd);
+}
+
+async function uploadStream(key, stream, options = {}) {
+  if (!S3_BUCKET) throw new Error('S3_BUCKET not configured');
+  const params = {
+    Bucket: S3_BUCKET,
+    Key: key,
+    Body: stream,
+    ContentType: options.ContentType || 'application/octet-stream'
+  };
+
+  // Use lib-storage Upload for multipart streaming
+  const uploader = new Upload({
+    client: s3,
+    params,
+    queueSize: options.queueSize || 4, // concurrent parts
+    partSize: options.partSize || 5 * 1024 * 1024 // 5 MB
+  });
+
+  // Wait for completion
+  await uploader.done();
+  return { Bucket: S3_BUCKET, Key: key };
 }
 
 async function generatePresignedUrlForGet(key, expiresIn = 3600) {
