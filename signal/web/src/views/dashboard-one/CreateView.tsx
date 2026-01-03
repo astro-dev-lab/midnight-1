@@ -203,6 +203,33 @@ export function CreateView({ role: _role, onNavigate }: CreateViewProps) {
                 ✓ Project "{createdProject.name}" created successfully!
               </div>
             )}
+
+            {/* Dev-only quick start: register + create project */}
+            {process.env.NODE_ENV !== 'production' && (
+              <div style={{ marginTop: 'var(--space-3)', display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      // Generate quick credentials
+                      const email = `quick+${Date.now()}@example.com`;
+                      const password = 'Password123!';
+                      // Register and set token in client
+                      await studioOS.register(email, password);
+                      // Create a sample project
+                      const project = await studioOS.createProject({ name: `Quick Project ${new Date().toLocaleTimeString()}` });
+                      handleProjectCreated(project);
+                    } catch (err) {
+                      setProjectError(err instanceof Error ? err.message : 'Quick start failed');
+                    }
+                  }}
+                  className="btn btn--tertiary"
+                >
+                  Quick Start: Register & Create Project
+                </button>
+                <small style={{ color: 'var(--color-gray-500)' }}>Dev only — creates a temporary account</small>
+              </div>
+            )}
           </form>
         </div>
       </section>
