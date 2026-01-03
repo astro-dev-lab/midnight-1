@@ -32,6 +32,33 @@ Minimal Node + Express app.
 
 Set `JWT_SECRET` in your `.env` before using auth.
 
+### Storage (S3)
+
+- To enable S3-backed storage, set `STORAGE_PROVIDER=s3` in your `.env`.
+- Required S3-related env vars when using S3:
+  - `S3_BUCKET` — the bucket name (e.g., `studioos-7itqmdwxmppezac89pezcawghuubkuse2a-s3alias`)
+  - `S3_REGION` — AWS region (e.g., `us-east-1`)
+  - `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY` — programmatic credentials (or use IAM role/Secrets Manager in production)
+  - `S3_ENDPOINT` — optional, for S3-compatible services (e.g., MinIO)
+  - `S3_FORCE_PATH_STYLE` — set to `true` for MinIO/path-style addressing
+
+Notes:
+- The storage layer uses multipart streaming uploads (via `@aws-sdk/lib-storage`) to avoid buffering large uploads in memory.
+- After streaming completes the service attempts to fetch object metadata (HEAD) to determine `sizeBytes`.
+- For production, prefer instance roles or Secrets Manager; avoid long-lived credentials in `.env`.
+
+### OpenAI / LLM
+
+- Configure the LLM using environment variables in `.env`:
+  - `OPENAI_API_KEY` — API key for OpenAI-compatible endpoint
+  - `OPENAI_API_BASE` — API base URL (defaults to `https://api.openai.com`)
+  - `OPENAI_MODEL` — model to use. To enable Raptor mini (Preview) for all clients set:
+    - `OPENAI_MODEL=raptor-mini-preview`
+  - `OPENAI_TIMEOUT` — request timeout in seconds (default 30)
+
+- Keep keys and secrets in a secure store for production environments; set them in your deployment platform or secrets manager rather than `.env` where possible.
+
+
 ## API
 
 - `GET /pings?limit=50&offset=0` — list pings (default limit 50, max 100)
