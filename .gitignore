@@ -22,3 +22,7 @@ yarn-error.log*
 *.tar.gz
 
 *.cjs
+
+# Local environment files
+.env
+.env.local
