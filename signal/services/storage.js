@@ -156,8 +156,15 @@ async function storeFileStream(fileKey, stream) {
     // If stream is small, uploadStream still handles it efficiently; it will use multipart when appropriate
     try {
       await s3Client.uploadStream(fileKey, stream, { ContentType: 'application/octet-stream' });
-      // We don't know final size without head; return null for size
-      return { fileKey, sizeBytes: null };
+      // Attempt to read object metadata (size) after upload
+      try {
+        const meta = await s3Client.headObjectExists(fileKey);
+        const sizeBytes = meta && meta.exists ? Number(meta.contentLength || 0) : null;
+        return { fileKey, sizeBytes };
+      } catch (metaErr) {
+        // If head fails, still consider upload successful but return null size
+        return { fileKey, sizeBytes: null };
+      }
     } catch (err) {
       throw new Error(`Failed to store file to S3: ${err.message}`);
     }

@@ -37,4 +37,27 @@ describe('S3 multipart streaming (lib-storage)', () => {
     expect(result.fileKey).toBe(fileKey);
     expect(result.sizeBytes).toBeNull();
   });
+
+  it('returns sizeBytes after upload when headObject succeeds', async () => {
+    // Mock s3Client to simulate uploadStream + headObjectExists
+    jest.resetModules();
+    process.env.STORAGE_PROVIDER = 's3';
+    process.env.S3_BUCKET = 'test-bucket';
+
+    const s3ClientMock = require('../services/s3Client');
+    s3ClientMock.uploadStream = jest.fn(async (key, readable) => ({ Bucket: 'test-bucket', Key: key }));
+    s3ClientMock.headObjectExists = jest.fn(async (key) => ({ exists: true, contentLength: 4096, lastModified: new Date() }));
+
+    const storage = require('../services/storage');
+    const fileKey = '1/stream-with-size.wav';
+    const readable = new stream.Readable({ read() {} });
+    readable.push(Buffer.from('x')); readable.push(null);
+
+    const result = await storage.storeFileStream(fileKey, readable);
+
+    expect(s3ClientMock.uploadStream).toHaveBeenCalled();
+    expect(s3ClientMock.headObjectExists).toHaveBeenCalledWith(fileKey);
+    expect(result.fileKey).toBe(fileKey);
+    expect(result.sizeBytes).toBe(4096);
+  });
 });
