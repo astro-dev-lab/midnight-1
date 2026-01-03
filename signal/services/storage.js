@@ -151,34 +151,16 @@ async function storeFile(fileKey, buffer) {
  * @returns {Promise<{ fileKey: string, sizeBytes: number }>}
  */
 async function storeFileStream(fileKey, stream) {
-  // S3-backed storage: collect stream into buffer then upload (acceptable for moderate sizes)
+  // S3-backed streaming upload to avoid buffering large files
   if (STORAGE_PROVIDER === 's3' && s3Client) {
-    return new Promise((resolve, reject) => {
-      const chunks = [];
-      let sizeBytes = 0;
-
-      stream.on('data', (chunk) => {
-        sizeBytes += chunk.length;
-        if (sizeBytes > MAX_FILE_SIZE) {
-          reject(new Error(`File size exceeds maximum of ${MAX_FILE_SIZE} bytes`));
-          stream.destroy();
-          return;
-        }
-        chunks.push(chunk);
-      });
-
-      stream.on('end', async () => {
-        try {
-          const buffer = Buffer.concat(chunks);
-          await s3Client.uploadBuffer(fileKey, buffer, { ContentType: 'application/octet-stream' });
-          resolve({ fileKey, sizeBytes });
-        } catch (err) {
-          reject(new Error(`Failed to store file to S3: ${err.message}`));
-        }
-      });
-
-      stream.on('error', (err) => reject(new Error(`Stream error: ${err.message}`)));
-    });
+    // If stream is small, uploadStream still handles it efficiently; it will use multipart when appropriate
+    try {
+      await s3Client.uploadStream(fileKey, stream, { ContentType: 'application/octet-stream' });
+      // We don't know final size without head; return null for size
+      return { fileKey, sizeBytes: null };
+    } catch (err) {
+      throw new Error(`Failed to store file to S3: ${err.message}`);
+    }
   }
 
   // Local filesystem

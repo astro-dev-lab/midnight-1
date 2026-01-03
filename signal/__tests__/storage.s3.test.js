@@ -73,6 +73,21 @@ describe('S3-backed Storage (manual mock)', () => {
     expect(s3ClientModule._s3.send).toHaveBeenCalled();
   });
 
+  it('streams upload via multipart uploader', async () => {
+    const s3ClientModule = require('../services/s3Client');
+    // mock uploadStream to verify it's called
+    s3ClientModule.uploadStream = jest.fn(async (key, readable, options) => ({ Bucket: 'test-bucket', Key: key }));
+
+    const storage = require('../services/storage');
+    const content = Buffer.alloc(10 * 1024 * 1024, 'a'); // 10MB
+    const readable = stream.Readable.from([content]);
+
+    const res = await storage.storeFileStream('1/stream-upload.dat', readable);
+
+    expect(s3ClientModule.uploadStream).toHaveBeenCalled();
+    expect(res.fileKey).toBe('1/stream-upload.dat');
+  });
+
   it('deletes an object from S3 via deleteFile', async () => {
     const s3ClientModule = require('../services/s3Client');
     s3ClientModule._s3.send = jest.fn(async (cmd) => ({}));

@@ -41,6 +41,31 @@ async function uploadBuffer(key, buffer, options = {}) {
   return { Bucket: S3_BUCKET, Key: key };
 }
 
+/**
+ * Stream upload using multipart (lib-storage Upload helper).
+ * Accepts a Node.js readable stream and streams parts to S3 to avoid buffering large files.
+ * options: { ContentType?, queueSize?, partSize? }
+ */
+async function uploadStream(key, readableStream, options = {}) {
+  if (!S3_BUCKET) throw new Error('S3_BUCKET not configured');
+  const params = {
+    Bucket: S3_BUCKET,
+    Key: key,
+    Body: readableStream,
+    ContentType: options.ContentType || 'application/octet-stream'
+  };
+
+  const upload = new Upload({
+    client: s3,
+    params,
+    queueSize: Number(process.env.S3_UPLOAD_QUEUE_SIZE || options.queueSize || 4),
+    partSize: Number(process.env.S3_PART_SIZE || options.partSize || 5 * 1024 * 1024)
+  });
+
+  await upload.done();
+  return { Bucket: S3_BUCKET, Key: key };
+}
+
 async function getObjectStream(key) {
   if (!S3_BUCKET) throw new Error('S3_BUCKET not configured');
   const cmd = new GetObjectCommand({ Bucket: S3_BUCKET, Key: key });
@@ -80,6 +105,8 @@ module.exports = {
   headObjectExists,
   deleteObject,
   generatePresignedUrlForGet,
+  // streaming upload
+  uploadStream,
   // export raw client for testing/mocking
   _s3: s3
 };
