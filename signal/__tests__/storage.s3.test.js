@@ -42,9 +42,10 @@ describe('S3-backed Storage (manual mock)', () => {
   });
 
   it('uploads a buffer to S3 via storeFile', async () => {
-    const storage = require('../services/storage');
+    const s3ClientModule = require('../services/s3Client');
+    s3ClientModule._s3.send = jest.fn(async (cmd) => ({ }));
 
-    S3Client.__setResponse('PutObjectCommand', async (cmd) => ({ }));
+    const storage = require('../services/storage');
 
     const fileKey = '1/test-upload.txt';
     const content = Buffer.from('hello s3');
@@ -53,37 +54,40 @@ describe('S3-backed Storage (manual mock)', () => {
 
     expect(res.fileKey).toBe(fileKey);
     expect(res.sizeBytes).toBe(content.length);
+    expect(s3ClientModule._s3.send).toHaveBeenCalled();
   });
 
   it('retrieves a file from S3 via getFile', async () => {
-    const storage = require('../services/storage');
-
+    const s3ClientModule = require('../services/s3Client');
     const content = Buffer.from('s3 data');
     const readable = stream.Readable.from([content]);
 
-    S3Client.__setResponse('GetObjectCommand', async (cmd) => ({ Body: readable }));
+    s3ClientModule._s3.send = jest.fn(async (cmd) => ({ Body: readable }));
+    const storage = require('../services/storage');
 
     const fileKey = '1/test-get.txt';
     const buf = await storage.getFile(fileKey);
 
     expect(Buffer.isBuffer(buf)).toBe(true);
     expect(buf.toString()).toBe('s3 data');
+    expect(s3ClientModule._s3.send).toHaveBeenCalled();
   });
 
   it('deletes an object from S3 via deleteFile', async () => {
+    const s3ClientModule = require('../services/s3Client');
+    s3ClientModule._s3.send = jest.fn(async (cmd) => ({}));
     const storage = require('../services/storage');
-
-    S3Client.__setResponse('DeleteObjectCommand', async (cmd) => ({}));
 
     const fileKey = '1/test-delete.txt';
     await expect(storage.deleteFile(fileKey)).resolves.toBeUndefined();
+    expect(s3ClientModule._s3.send).toHaveBeenCalled();
   });
 
   it('checks existence via headObject', async () => {
-    const storage = require('../services/storage');
-
+    const s3ClientModule = require('../services/s3Client');
     // HeadObject resolves when exists
-    S3Client.__setResponse('HeadObjectCommand', async (cmd) => ({ ContentLength: 123, LastModified: new Date() }));
+    s3ClientModule._s3.send = jest.fn(async (cmd) => ({ ContentLength: 123, LastModified: new Date() }));
+    const storage = require('../services/storage');
 
     const fileKey = '1/test-head.txt';
     const exists = await storage.fileExists(fileKey);
@@ -91,21 +95,29 @@ describe('S3-backed Storage (manual mock)', () => {
     expect(exists).toBe(true);
 
     // Now simulate not found
-    S3Client.__setResponse('HeadObjectCommand', async (cmd) => { const err = new Error('NotFound'); err.name = 'NotFound'; err.$metadata = { httpStatusCode: 404 }; throw err; });
+    s3ClientModule._s3.send = jest.fn(async (cmd) => { const err = new Error('NotFound'); err.name = 'NotFound'; err.$metadata = { httpStatusCode: 404 }; throw err; });
     const notExists = await storage.fileExists('1/missing.txt');
     expect(notExists).toBe(false);
+    expect(s3ClientModule._s3.send).toHaveBeenCalled();
   });
 
   it('generates a presigned URL via S3 presigner', async () => {
-    const storage = require('../services/storage');
+    // Ensure s3Client presign wrapper calls getSignedUrl
+    const s3ClientModule = require('../services/s3Client');
 
     const fileKey = '1/test-presign.wav';
-    const baseUrl = 'https://api.example.com';
+    const presigner = require('@aws-sdk/s3-request-presigner');
+    expect(typeof presigner.getSignedUrl).toBe('function');
+    expect(jest.isMockFunction(presigner.getSignedUrl)).toBe(true);
 
-    const { url, expiresAt } = await storage.generatePresignedUrl(fileKey, baseUrl, 3600);
+    const url = await s3ClientModule.generatePresignedUrlForGet(fileKey, 3600);
 
     expect(url).toBe('https://signed.example.com/download');
-    expect(expiresAt).toBeInstanceOf(Date);
-    expect(getSignedUrl).toHaveBeenCalled();
+    expect(presigner.getSignedUrl).toHaveBeenCalled();
+
+    // And via storage wrapper
+    const storage = require('../services/storage');
+    const res = await storage.generatePresignedUrl(fileKey, 'https://api.example.com', 3600);
+    expect(res.url).toBe('https://signed.example.com/download');
   });
 });

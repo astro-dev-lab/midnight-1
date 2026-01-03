@@ -79,5 +79,7 @@ module.exports = {
   getObjectStream,
   headObjectExists,
   deleteObject,
-  generatePresignedUrlForGet
+  generatePresignedUrlForGet,
+  // export raw client for testing/mocking
+  _s3: s3
 };
